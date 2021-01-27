@@ -1,1 +1,1 @@
-This repository contains the code that was used in the paper _"Is There a Replication Crisis in Finance"_ by Jensen, Kelly and Pedersen (2021).
+This repository contains code that create a dataset of global stock returns and characteristics. The dataset was created for the paper _Is There a Replication Crisis in Finance_ by Jensen, Kelly and Pedersen (2021). Please cite this paper if you are using the data. 
