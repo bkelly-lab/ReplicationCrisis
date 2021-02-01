@@ -29,6 +29,7 @@ libname project "~/Global Data";
 *****************************************************************************
 * Create Characteristics Based on Accounting Data
 **************************************************************************** ;
+*Create Accounting Data;
 %standardized_accounting_data(coverage='world', convert_to_usd=1, me_data = scratch.world_msf, include_helpers_vars=1, start_date='31DEC1949'd); 
 %create_acc_chars(data=acc_std_ann, out=achars_world, lag_to_public=4, max_data_lag=18, __keep_vars=&char_vars., me_data=scratch.world_msf, suffix=);
 %create_acc_chars(data=acc_std_qtr, out=qchars_world, lag_to_public=4, max_data_lag=18, __keep_vars=&char_vars., me_data=scratch.world_msf, suffix=_qitem);
@@ -69,8 +70,8 @@ data scratch.world_data_prelim; set world_data2; run;
 * Asset Pricing Factors
 **************************************************************************** ; 
 * Create monthly and daily factors from FF3 and HXZ4;
-%ap_factors(out=scratch.ap_factors_monthly, freq=m, sf=scratch.world_msf, mchars=scratch.world_data_prelim, mkt=scratch.market_returns, min_stocks_bp=10, min_stocks_pf=5);	
-%ap_factors(out=scratch.ap_factors_daily, freq=d, sf=scratch.world_dsf, mchars=scratch.world_data_prelim, mkt=scratch.market_returns_daily, min_stocks_bp=10, min_stocks_pf=5);	
+%ap_factors(out=scratch.ap_factors_monthly, freq=m, sf=scratch.world_msf, mchars=scratch.world_data_prelim, mkt=scratch.market_returns, min_stocks_bp=10, min_stocks_pf=3);	
+%ap_factors(out=scratch.ap_factors_daily, freq=d, sf=scratch.world_dsf, mchars=scratch.world_data_prelim, mkt=scratch.market_returns_daily, min_stocks_bp=10, min_stocks_pf=3);	
 
 *****************************************************************************
 * Factor based on combined data
@@ -137,4 +138,6 @@ proc export data=scratch.market_returns
 run;
 
 /* Save main data as .csv files by country */
-%save_main_data_csv(out=world, data=scratch.world_data, path=/scratch/cbs/tij);
+%if 0=1 %then %do;
+	%save_main_data_csv(out=world, data=scratch.world_data, path=/scratch/cbs/tij);
+%end;

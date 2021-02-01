@@ -1034,7 +1034,7 @@ Importantly, a given company (gvkey) can potentially have up to 3 primary securi
 			create table world_sf1 as 
 			select excntry, id, eom, ret_exc
 			from &sf.
-			where ret_lag_dif = 1 and not missing(ret_exc); * Impose a maximum lag of 5 days between return calculation;
+			where ret_lag_dif = 1 and not missing(ret_exc); 
 		quit;
 		%winsorize_own(inset=world_sf1, outset=world_sf2, sortvar=eom, vars=ret_exc, perc_low=0.1, perc_high=99.9); /* Winsorize Returns at 0.1% */
 		%let __date_col = eom;
@@ -1044,16 +1044,17 @@ Importantly, a given company (gvkey) can potentially have up to 3 primary securi
 	proc sql;
 		create table base1 as 
 		select id, eom, size_grp, excntry, me, market_equity, be_me, at_gr1, niq_be,
-			source, obs_main, common, primary_sec, ret_lag_dif
+			source, obs_main, common, comp_exchg, crsp_exchcd, primary_sec, ret_lag_dif
 		from &mchars.;
 	quit;
 	
 	%winsorize_own(inset=base1, outset=base2, sortvar=eom, vars=me, perc_low=0.1, perc_high=99.9); /* Winsorize market equity at 0.1% */
 	
 	proc sort data=base2; by id eom; run;
-
+	
+	%macro temp();
 	/* Lag variables used at portfolio rebalacing */
-	%let cols_lag = obs_main common primary_sec excntry size_grp me be_me at_gr1 niq_be;
+	%let cols_lag = comp_exchg crsp_exchcd obs_main common primary_sec excntry size_grp me be_me at_gr1 niq_be;
 	data base3; 
 		set base2;
 		by id eom;
@@ -1065,6 +1066,8 @@ Importantly, a given company (gvkey) can potentially have up to 3 primary securi
 			drop &col.;
 		%end;
 	run;
+	%mend;
+	%temp();
 	
 	/* Screens */
 	proc sql;
@@ -1081,16 +1084,16 @@ Importantly, a given company (gvkey) can potentially have up to 3 primary securi
 	
 	/* Factors: Three-by-two sort on var and size Fama-French Style*/
 	%macro sort_ff_style(out=, char=, freq=, min_stocks_bp=, min_stocks_pf=);
-		* Breakpoints (based on non microcap stocks);
+		* Breakpoints (based on NYSE stocks in the US and non-microcap stocks outside of the US);
 		proc sql;
-			create table non_mc as
+			create table bp_stocks as
 			select *
 			from base4
-			where size_grp_l in ('small', 'large', 'mega') and not missing(&char._l)
+			where ((size_grp_l in ('small', 'large', 'mega') and excntry_l ^= 'USA') or ((crsp_exchcd_l=1 or comp_exchg_l=11) and excntry_l = 'USA')) and not missing(&char._l)
 			order by eom, excntry_l;
 		quit;
 		
-		proc means data=non_mc noprint;
+		proc means data=bp_stocks noprint;
 			by eom excntry_l;
 			var &char._l;
 			output out=bps(drop=_type_ _freq_) N=n P30 = bp_p30 P70=bp_p70;
@@ -1232,42 +1235,45 @@ Importantly, a given company (gvkey) can potentially have up to 3 primary securi
 		from main_data3;
 	quit;
 	
-	%macro temp();
-		%do i=1 %to %nwords(&countries.);
-			%let __c = %scan(&countries., &i., %str(' '));
-			%put ################ "&path./&__c..csv" ########################;
-			proc export data=main_data3(where=(excntry = upcase("&__c.")))
-			    outfile="&path./&__c..csv"   
-			    dbms=CSV
-			    replace;
-			run;
-		%end;
-	%mend;
-	%temp();
-	
-	* Delete file;
-	%macro file_delete(file);
-	  %let rc= %sysfunc(filename(fref,&file));
-	  %let rc= %sysfunc(fdelete(&fref));
-	%mend;
+	/* Create country .csv files */
+	option nonotes;
+	%do i=1 %to %nwords(&countries.);
+		%let __c = %scan(&countries., &i., %str(' '));
+		%put ################ "&path./&__c..csv" ########################;
+		proc export data=main_data3(where=(excntry = upcase("&__c.")))
+		    outfile="&path./&__c..csv"   
+		    dbms=CSV
+		    replace;
+		run;
+	%end;
+	option notes;
 	
 	* Zip file for easier download;
 	ods package (newzip) open nopf;
-	%macro temp();
-		%do i=1 %to %nwords(&countries.);
-			%let __c = %scan(&countries., &i., %str(' '));
-			ods package (newzip) add file="&path./&__c..csv";
-			%file_delete(file=&path./&__c..csv);
-		%end;
-	%mend;
-	%temp();
+	%do i=1 %to %nwords(&countries.);
+		%let __c = %scan(&countries., &i., %str(' '));
+		ods package (newzip) add file="&path./&__c..csv";
+	%end;
 	ods package (newzip) publish archive 
 		properties (
 			archive_name="&out..zip" 
 			archive_path= "&path."
 		);
 	ods package(newzip) close;
+	
+	/* Delete intermidiate .csv files */
+	%macro file_delete(file);
+	  %let rc= %sysfunc(filename(fref,&file));
+	  %let rc= %sysfunc(fdelete(&fref));
+	%mend;
+	%do i=1 %to %nwords(&countries.);
+		%let __c = %scan(&countries., &i., %str(' '));
+		%file_delete(file=&path./&__c..csv);
+	%end;
+	proc delete data = main_data1 main_data2 main_data3; run;
 %mend;
+
+
 
 
 /* Footnotes */*

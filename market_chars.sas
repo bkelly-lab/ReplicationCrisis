@@ -750,7 +750,7 @@
 				select *
 				from __dimson1
 				group by id, eom
-				having count(*) >= &__min.; 
+				having count(*) >= (&__min. - 1);  /* Minus one to reflect the fact that there is one less available observation due to the need of avoiding lookahead bias. */ 
 			quit;
 			
 			proc reg data=__dimson2 outest=__dimson3 edf NOPRINT;
