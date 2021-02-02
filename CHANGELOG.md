@@ -21,14 +21,7 @@ __Changes__:
 - Fixed error in creating _qmj_prof_. The issue was that the _oaccruals_at_ used the value instead of the z-score of ranks. This effectively meant that accruals didn't impact the profitability score. 
 - Fixed error for annual seasonality characteristics (factor names starting with seas_ and ending with _an). There was a bug in the screening procedure which meant that the characteristic for one stock could use information from an unrelated stock. 
 - Rounding issues when converting a .csv file to an excel file, caused the zero_trades_* variables to not have any decimals which made the turnover tie-breaker ineffective.
-- Before, standardized unexpected earnings (niq_su) and sales (saleq_su) was computed as 
-$$
-SU_\text{old}=\frac{X_t-(X_{t-3} + \text{MEAN}_z(X_{t-3}-X_{t-15}))}{\text{SDEV}_z(X_{t-3}-X_{t-15})}
-$$
-Which is wrong because the one year mean change is added to the most recent quarter. Instead, we know add the one year mean change to the value in the same quarter as predicted, but one year ago.
-$$
-SU_\text{new}=\frac{X_t-(X_{t-12} + \text{MEAN}_z(X_{t-3}-X_{t-15}))}{\text{SDEV}_z(X_{t-3}-X_{t-15})}
-$$
+- Standardized unexpected earnings (niq_su) and sales (saleq_su) is computed as the actual value minus the expected value (standardized by the standard deviation of this change). Before, the expected value was computed as the mean yearly change over the last 8 quarters added to the last quarterly value. Now the expected value is the same mean yearly change, but added to the quarterly value 4 quarters ago consistent with Jegadeesh and Livnat (2006).
   
 __Impact__:
 
@@ -47,3 +40,4 @@ __Changes__:
 __Impact__:
 
 - Replication Rate: 84.9%
+
