@@ -4,7 +4,7 @@
 proc delete data = _all_ ; run ; 
 
 /* Assign Libraries */
-libname scratch "/scratch/cbs/tij"; /* REMEMBER TO ENSURE THAT FOLDER IS NOT DELETED!!*/
+libname scratch "/scratch/yale/tyler"; /* REMEMBER TO ENSURE THAT FOLDER IS NOT DELETED!!*/
 libname project "~/Global Data";
 
 /* Include Project Macros */
@@ -12,6 +12,17 @@ libname project "~/Global Data";
 %include "~/Global Data/char_macros.sas";
 %include "~/Global Data/market_chars.sas";
 %include "~/Global Data/accounting_chars.sas";
+%include "~/Global Data/ind_identification.sas";
+
+*****************************************************************************
+* Create Industry Identification Data 
+***************************************************************************** ;
+%CRSP_PERMNO(OUT = crsp_id, ff_num = 49);
+%COMP_JOIN(OUT = comp_id, ff_num = 49);
+
+/* Save Data */
+data scratch.crsp_id; set crsp_id; run;
+data scratch.comp_id; set comp_id; run;
 
 *****************************************************************************
 * Create Return Data
