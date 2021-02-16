@@ -4,7 +4,7 @@
 proc delete data = _all_ ; run ; 
 
 /* Assign Libraries */
-libname scratch "/scratch/yale/tyler"; /* REMEMBER TO ENSURE THAT FOLDER IS NOT DELETED!!*/
+libname scratch "/scratch/cbs/tij"; /* REMEMBER TO ENSURE THAT FOLDER IS NOT DELETED!!*/
 libname project "~/Global Data";
 
 /* Include Project Macros */
@@ -142,6 +142,11 @@ run;
 proc sort data=world_data5 out=scratch.world_data nodup; by id eom; run;
 
 /* Save Market Returns as .csv */
+proc export data=scratch.market_returns_daily
+    outfile="~/Global Data/market_returns_daily.csv"   
+    dbms=CSV
+    replace;
+run;
 proc export data=scratch.market_returns
     outfile="~/Global Data/market_returns.csv"   
     dbms=CSV

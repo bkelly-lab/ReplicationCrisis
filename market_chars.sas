@@ -684,7 +684,7 @@
 				create table __ff32 as 
 				select id, calc_date as eom, sqrt(_rmse_**2 * _edf_ / (_edf_ + 1)) as ivol_ff3&sfx.
 				from __ff31
-				where (_edf_ + 2) >= &__min.;
+				where (_edf_ + 4) >= &__min.;
 			quit;
 			
 			* Idiosyncratic skewness;
@@ -717,7 +717,7 @@
 				create table __hxz42 as 
 				select id, calc_date as eom, sqrt(_rmse_**2 * _edf_ / (_edf_ + 1)) as ivol_hxz4&sfx.
 				from __hxz41
-				where (_edf_ + 2) >= &__min.;
+				where (_edf_ + 5) >= &__min.;
 			quit;
 			
 			* Idiosyncratic skewness;
