@@ -5,6 +5,17 @@ This change log keeps track of changes to the underlying dataset. In brackets, w
 
 __Changes__:
 
+- A bug caused _ivol_ff3_21d_, _iskew_ff3_21d_, _ivol_hxz4_21d_ and _iskew_hxz4_21d_ to require 17 (ff3) and 18 (hxz) observations for a valid estimate. Consistent with our original intent, we now require at least 15 observations for a valid estimate.    
+
+__Impact__:
+
+- Replication Rate: 84.0%. 
+- The changes had a negligible effect on the affected factors.
+
+## 02-01-2021 
+
+__Changes__:
+
 - Fixed a small bug in the bidask_hl() macro.
 - When creating asset pricing factors (FF and HXZ), we previously required at least 5 stocks in a sub-portfolio (e.g. small stocks with high BM) for the observation to be valid. This led to missing observation in the 1950's for small stocks with low bm. We lowered this requirement to at least 3 stocks. Furthermore, when creating asset pricing factors, we changed the breakpoints to be based on NYSE stocks in the US instead of non-microcap stocks. Outside of the US, breakpoints are still based on non-microcap stocks.
   
