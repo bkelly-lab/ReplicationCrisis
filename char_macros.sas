@@ -10,7 +10,7 @@
 		select id, eom, excntry, chcsho_12m, eqnpo_12m, oaccruals_at, noa_at, at_gr1, ppeinv_gr1a, 
 			o_score, ret_12_1, gp_at, niq_at
 		from &data.
-		where common=1 and primary_sec=1 and obs_main=1 and not missing(ret_exc) and not missing(me)
+		where common=1 and primary_sec=1 and obs_main=1 and exch_main = 1 and not missing(ret_exc) and not missing(me)
 		order by excntry, eom;
 	quit;
 	%let __vars = chcsho_12m eqnpo_12m oaccruals_at noa_at at_gr1 ppeinv_gr1a o_score ret_12_1 gp_at niq_at;
@@ -90,7 +90,7 @@
 			gp_at, ni_be, ni_at, ocf_at, gp_sale, oaccruals_at, gpoa_ch5, roe_ch5, roa_ch5, cfoa_ch5, 
 			gmar_ch5, betabab_1260d, debt_at, o_score, z_score
 		from &data.
-		where common=1 and primary_sec=1 and obs_main=1 and not missing(ret_exc) and not missing(me)
+		where common=1 and primary_sec=1 and obs_main=1 and exch_main=1 and not missing(ret_exc) and not missing(me)
 		order by excntry, eom;
 	quit;
 	%let z_vars    = gp_at ni_be ni_at ocf_at gp_sale oaccruals_at

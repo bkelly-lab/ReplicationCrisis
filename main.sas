@@ -15,39 +15,43 @@ libname project "~/Global Data";
 %include "~/Global Data/ind_identification.sas";
 
 *****************************************************************************
-* Create Industry Identification Data 
-***************************************************************************** ;
-%CRSP_PERMNO(OUT = crsp_id, ff_num = 49);
-%COMP_JOIN(OUT = comp_id, ff_num = 49);
-
-/* Save Data */
-data scratch.crsp_id; set crsp_id; run;
-data scratch.comp_id; set comp_id; run;
-
-*****************************************************************************
 * Create Return Data
 **************************************************************************** ; 
-/* Prepare Data */
 %prepare_comp_sf(freq=both);
 %prepare_crsp_sf(freq=d);
 %prepare_crsp_sf(freq=m);
-%combine_crsp_comp_sf(out_msf=scratch.world_msf, out_dsf=scratch.world_dsf, crsp_msf=crsp_msf, comp_msf=comp_msf, crsp_dsf=crsp_dsf, comp_dsf=comp_dsf);
+%combine_crsp_comp_sf(out_msf=world_msf1, out_dsf=scratch.world_dsf, crsp_msf=crsp_msf, comp_msf=comp_msf, crsp_dsf=crsp_dsf, comp_dsf=comp_dsf);
 
-/* Create Market Returns */
+*****************************************************************************
+* Add Industry Codes 
+***************************************************************************** ;
+%crsp_industry(out=crsp_ind);
+%comp_industry(out=comp_ind);
+
+proc sql;
+	create table world_msf2 as
+	select a.*, b.gics as gics, coalesce(b.sic, c.sic) as sic, coalesce(b.naics, c.naics) as naics /* Prefer COMPUSTAT to CRSP */
+	from world_msf1 as a
+	left join comp_ind as b on a.gvkey=b.gvkey and a.eom=b.date
+	left join crsp_ind as c on a.permco=c.permco and a.permno=c.permno and a.eom=c.date;
+quit;
+
+* Add a column 'ff49' with Fama-French industry classification;
+%ff_ind_class(data=world_msf2, ff_grps=49, out=scratch.world_msf); 
+
+*****************************************************************************
+* Market Returns
+**************************************************************************** ; 
 %market_returns(out = scratch.market_returns, data = scratch.world_msf, freq=m, wins = 0.1);
 %market_returns(out = scratch.market_returns_daily, data = scratch.world_dsf, freq=d, wins = 0.1);
 
 *****************************************************************************
 * Create Characteristics Based on Accounting Data
 **************************************************************************** ;
-*Create Accounting Data;
 %standardized_accounting_data(coverage='world', convert_to_usd=1, me_data = scratch.world_msf, include_helpers_vars=1, start_date='31DEC1949'd); 
 %create_acc_chars(data=acc_std_ann, out=achars_world, lag_to_public=4, max_data_lag=18, __keep_vars=&char_vars., me_data=scratch.world_msf, suffix=);
 %create_acc_chars(data=acc_std_qtr, out=qchars_world, lag_to_public=4, max_data_lag=18, __keep_vars=&char_vars., me_data=scratch.world_msf, suffix=_qitem);
-%combine_ann_qtr_chars(out=acc_chars_world, ann_data=achars_world, qtr_data=qchars_world, __char_vars=&char_vars., q_suffix=_qitem);
-
-* Save Accounting Data;
-data scratch.acc_chars_world; set acc_chars_world; run;
+%combine_ann_qtr_chars(out=scratch.acc_chars_world, ann_data=achars_world, qtr_data=qchars_world, __char_vars=&char_vars., q_suffix=_qitem);
 
 *****************************************************************************
 * Create Characteristics Based on Monthly Market Data
@@ -81,8 +85,8 @@ data scratch.world_data_prelim; set world_data2; run;
 * Asset Pricing Factors
 **************************************************************************** ; 
 * Create monthly and daily factors from FF3 and HXZ4;
-%ap_factors(out=scratch.ap_factors_monthly, freq=m, sf=scratch.world_msf, mchars=scratch.world_data_prelim, mkt=scratch.market_returns, min_stocks_bp=10, min_stocks_pf=3);	
 %ap_factors(out=scratch.ap_factors_daily, freq=d, sf=scratch.world_dsf, mchars=scratch.world_data_prelim, mkt=scratch.market_returns_daily, min_stocks_bp=10, min_stocks_pf=3);	
+%ap_factors(out=scratch.ap_factors_monthly, freq=m, sf=scratch.world_msf, mchars=scratch.world_data_prelim, mkt=scratch.market_returns, min_stocks_bp=10, min_stocks_pf=3);	
 
 *****************************************************************************
 * Factor based on combined data
@@ -131,8 +135,8 @@ quit;
 
 * Reorder Variables;
 data world_data5;
-	retain id date eom source size_grp obs_main primary_sec gvkey iid permno permco excntry curcd fx 
-		common comp_tpci crsp_shrcd comp_exchg crsp_exchcd
+	retain id date eom source size_grp obs_main exch_main primary_sec gvkey iid permno permco excntry curcd fx 
+		common comp_tpci crsp_shrcd comp_exchg crsp_exchcd gics sic naics ff49
 		adjfct shares me me_company prc prc_local dolvol ret ret_local ret_exc ret_lag_dif ret_exc_lead1m
 		market_equity enterprise_value book_equity assets sales net_income; 
 	set world_data4;

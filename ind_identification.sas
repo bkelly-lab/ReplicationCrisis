@@ -1,15 +1,15 @@
-%macro French_ID(data =, id_split =, OUT =);
-	/* Add variable matching 4-digit SIC identifiers to Fama-French industry identifiers
+* MACRO: FF_IND_CLASS
+	Add variable matching 4-digit SIC identifiers to Fama-French industry identifiers
 	   Arguments:
 	   	data: name of input dataset that includes 4-digit SIC codes under name 'sic'
-	   	id_split: number of industry portfolios for Fama-French identifiers
-	   	OUT: name of output dataset*/
-	
-	%if &id_split = 38 %then %do;
+	   	ff_grps: number of industry portfolios for Fama-French identifiers
+	   	OUT: name of output dataset;
+%macro ff_ind_class(data=, ff_grps=, out=);
+	%if &ff_grps = 38 %then %do;
 		proc sql;
 			/* French identifies "Other" as "almost nothing", so no firms are identified as "other" 
 			https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/Data_Library/det_38_ind_port.html*/
-			create table &OUT as
+			create table &out. as
 			select *, 
 				case
 					when 100 <= sic <= 999 then 1
@@ -50,14 +50,14 @@
 					when 7000 <= sic <= 8999 then 36 
 					when 9000 <= sic <= 9999 then 37
 					else .
-				end as french_id
-			from &data;
+				end as ff38
+			from &data.;
 		run;
 		%end;
 		
-	%else %if &id_split = 49 %then %do;
+	%else %if &ff_grps. = 49 %then %do;
 		proc sql;
-			create table &OUT as
+			create table &out. as
 			select *, 	
 				case
 					when sic = 2048 or 100 <= sic <= 299 or 700 <= sic <= 799 or 910 <= sic <= 919 then 1
@@ -149,23 +149,22 @@
 						6740 <= sic <= 6779 or 6790 <= sic <= 6795 then 48
 					when sic in (4970, 4971, 4990, 4991) or 4950 <= sic <= 4961 then 49
 					else .
-				end as french_id
-				from &data;
+				end as ff49
+				from &data.;
 			run;
 			%end;
-%mend French_ID;
+%mend;
 
-%macro CRSP_PERMNO(OUT =, ff_num =);
-	/* Create daily historical 4-digit SIC, NAICS and Fama-French industry identifiers dataset from CRSP data 
+* MACRO: CRSP_INDUSTRY
+	Create daily historical SIC and NAICS industry identifiers dataset from CRSP data 
 	   Arguments:
-	   	OUT: name of output dataset
-	   	ff_num: number of industry portfolios for the Fama-French identifiers (38 or 49)
-
+	   	out: name of output dataset;
+%macro crsp_industry(out=);
 	/* Pull distinct date ranges and identifiers from CRSP datasets */
 	proc sql;
 		create table permno0 as
-		select distinct permno, permco, namedt, nameendt, siccd as sic, naics
-		from CRSP.DSENAMES
+		select distinct permno, permco, namedt, nameendt, siccd as sic, input(naics, 6.0) as naics/* NAICS codes can't have leading zeroes so this should be okay*/
+		from crsp.dsenames
 		order by permno, namedt, nameendt;
 	run;
 	
@@ -177,22 +176,19 @@
 		if missing(naics) then naics = -999;
 	run;
 	
-	/* Add Fama-French Identifiers */
-	%French_ID(data = permno1, id_split = &ff_num, OUT = permno2);
-	
 	/* Find date distance for date ranges */
-	data permno3; 
-		set permno2;
+	data permno2; 
+		set permno1;
 		permno_diff = intck('day', namedt, nameendt, 'd');
 	run;
 
-	proc sort data = permno3;
+	proc sort data = permno2;
 		by permno namedt nameendt;
 	run;
 	
 	/* Create new rows between valid dates */
-	data permno4;
-		set permno3;
+	data permno3;
+		set permno2;
 		output;
 		n = 0;
 		if permno_diff > 0 then do;
@@ -206,41 +202,25 @@
 	run;
 	
 	/* Get ready for output */
-	data permno5;
-		set permno4;
+	data permno4;
+		set permno3;
 		if sic = -999 then sic = .;
 		if naics = -999 then naics = .;
 		date = namedt;
 		drop namedt;
 		format date yymmddn8.;
 	run;
+		
+	proc sort data= permno4 out= &out. nodup; by permno date; run;
 	
-	/* Change name of Fama-French identifier to reflect the number of industry portfolios */
-	%if &ff_num = 38 %then %do;
-		data permno6;
-			rename french_id = ind_ff38;
-			set permno5;
-		run;
-	%end;
-	
-	%if &ff_num = 49 %then %do;
-		data permno6;
-			rename french_id = ind_ff49;
-			set permno5;
-		run;
-	%end;
-	
-	proc sort data= permno6 out= &OUT nodup; by permno date; run;
-	
-	proc delete data = permno0 permno1 permno2 permno3 permno4 permno5 permno6; run;
-%mend CRSP_PERMNO; 
+	proc delete data = permno0 permno1 permno2 permno3 permno4; run;
+%mend; 
 
-%macro COMP_SIC_NAICS(OUT =, ff_num =);
-	/* Create a daily historical 4-digit SIC, NAICS and Fama-French industry identifiers dataset using NA and global data
+* MACRO: COMP_SIC_NAICS 
+	Create a daily historical SIC and NAICS industry identifiers dataset using NA and global annual reports
 	   Arguments: 
-	   	OUT: name of output dataset
-	   	ff_num: number of fama-french industry portfolios to create (38 or 49) */
-
+	   	OUT: name of output dataset;
+%macro comp_sic_naics(OUT =, ff_num =);
 	proc sql;
 		/* Retrieve NA identifiers */
 		create table comp1 as
@@ -278,17 +258,15 @@
 		format date yymmddn8.;
 		drop gvkeya gvkeyb datea dateb sica sicb naicsa naicsb;
 	run;
-
-	%French_ID(data = comp5, id_split = &ff_num, OUT = comp6);
 	
 	/* Sort descending*/
-	proc sort data = comp6;
+	proc sort data = comp5;
 		by gvkey descending date;
 	run;
 	
 	/* Add valid date to in order to extend to daily observation */
-	data comp7;
-		set comp6;
+	data comp6;
+		set comp5;
 		by gvkey;
 		valid_to = intnx('day', lag(date), -1);
 		if FIRST.gvkey then do;
@@ -298,23 +276,23 @@
 	run;
 	
 	/* Re-sort */
-	proc sort data = comp7;
+	proc sort data = comp6;
 		by gvkey date valid_to;
 	run;
 	
 	/* Find date distance for date ranges */
-	data comp8; 
-		set comp7;
+	data comp7; 
+		set comp6;
 		comp_diff = intck('day', date, valid_to, 'd');
 	run;
 
-	proc sort data = comp8;
+	proc sort data = comp7;
 		by gvkey date valid_to;
 	run;
 	
 	/* Create new rows between valid dates */
-	data comp9;
-		set comp8;
+	data comp8;
+		set comp7;
 		output;
 		n = 0;
 		if comp_diff > 0 and comp_diff ne . then do;
@@ -327,22 +305,22 @@
 		drop valid_to comp_diff n;
 	run;
 
-	proc sort data= comp9 out= &OUT nodup; by gvkey date; run;
+	proc sort data= comp8 out= &out. nodup; by gvkey date; run;
 	
-	proc delete data = comp1 comp2 comp3 comp4 comp5 comp6 comp7 comp8 comp9; run;
-%mend COMP_SIC_NAICS;
+	proc delete data = comp1 comp2 comp3 comp4 comp5 comp6 comp7 comp8; run;
+%mend;
 
-%macro COMP_HGICS(lib =, OUT =);
-	/* Create a daily historical gics dataset from COMPUSTAT, either from the NA or global dataset 
+* MACRO: COMP_HGICS
+	 Create a daily historical gics dataset from COMPUSTAT, either from the NA or global dataset 
 	   Arguments:
 	   	lib: COMPUSTAT library from which to pull historical gics data (CO_HGICS if NA, G_CO_HGICS if global)
-		OUT: name of output dataset*/
-
+		OUT: name of output dataset;
+%macro COMP_HGICS(lib =, out =);
 	/* Pull historical gics data */
 	proc sql;
 		create table gic1 as
 		select distinct gvkey, indfrom, indthru, gsubind as gics
-		from COMP.&lib
+		from comp.&lib.
 		where not missing(gvkey);
 	run;
 	
@@ -401,11 +379,11 @@
 	proc delete data = gic1 gic2 gic3 gic4 gic5 gic6; run;
 %mend COMP_HGICS;
 
-%macro HGICS_JOIN(OUT =);
-	/* Join NA and global daily historical gics data from COMPUSTAT 
+/* MACRO: HGICS JOIN
+	Join NA and global daily historical gics data from COMPUSTAT 
 	   Argument: 
 	   	OUT: name of output dataset */
-
+%macro HGICS_JOIN(out=);
 	/* Construct NA and global historical gics data */
 	%COMP_HGICS(lib = CO_HGIC, OUT = NA_HGICS);
 	%COMP_HGICS(lib = G_CO_HGIC, OUT = G_HGICS);
@@ -430,21 +408,20 @@
 	proc sort data = gjoin2 out= &OUT nodup; by gvkey date; run;
 	
 	proc delete data = NA_HGICS G_HGICS gjoin1 gjoin2; run;
-%mend HGICS_JOIN;
+%mend;
 
-%macro COMP_JOIN(OUT =, ff_num =);
-	/* Join SIC, NAICS and Fama-French industry identifiers to GICS identifiers constructed from COMPUSTAT data
+* MACRO: COMP_INDUSTRY
+	Join SIC and NAICS industry identifiers to GICS identifiers constructed from COMPUSTAT data
 	   Arguments:
-	   	OUT: name of output dataset
-	   	ff_num: number of Fama-French industry portfolios */
-	   	
+	   	OUT: name of output dataset;
+%macro comp_industry(out=);
 	/* Construct datasets */
-	%HGICS_JOIN(OUT = COMP_GICS);
-	%COMP_SIC_NAICS(OUT = COMP_OTHER, ff_num = 49);
+	%hgics_join(out=comp_gics);
+	%comp_sic_naics(out=comp_other);
 	
 	/* Join datasets */
 	data join1;
-		merge COMP_GICS COMP_OTHER;
+		merge comp_gics comp_other;
 		by gvkey date;
 	run;
 	
@@ -494,7 +471,6 @@
 				gics      = .;
 				sic       = .;
 				naics     = .;
-				french_id = .;
 				n + 1;
 				output;
 			end;
@@ -512,23 +488,8 @@
 		by gvkey date;
 	run;
 	
-	/* Change name of Fama-French identifier to reflect the number of industry portfolios */
-	%if &ff_num = 38 %then %do;
-		data joined2;
-			rename french_id = ind_ff38;
-			set joined;
-		run;
-	%end;
+	proc sort data = joined1 out= &out. nodup; by gvkey date; run;	
 	
-	%if &ff_num = 49 %then %do;
-		data joined2;
-			rename french_id = ind_ff49;
-			set joined1;
-		run;
-	%end;
-	
-	proc sort data = joined2 out= &OUT nodup; by gvkey date; run;	
-	
-	proc delete data = COMP_GICS COMP_OTHER join1 join2 join3 gap1 gap2 gap3 joined1 joined2; run;
-%mend COMP_JOIN;
+	proc delete data = comp_gics comp_other join1 join2 join3 gap1 gap2 gap3 joined1; run;
+%mend;
 

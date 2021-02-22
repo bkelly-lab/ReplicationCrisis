@@ -523,12 +523,11 @@ Description:
 	run;
 	
 	/* Add Market Equity at Fiscal End */
-	
 	proc sql;
 		create table __me_data as 
 		select distinct gvkey, eom, me_company as me_fiscal 
 		from &me_data.
-		where not missing(gvkey) and primary_sec=1 and not missing(me_company) and common=1 and obs_main=1
+		where not missing(gvkey) and primary_sec=1 and not missing(me_company) and common=1 and obs_main=1 /* Notice, exch_main is not a requirement */
 		group by gvkey, eom
 		having me_company=max(me_company);
 	quit; 
@@ -1095,7 +1094,7 @@ Description:
 		create table __me_data1 as 
 		select distinct gvkey, eom, me_company /* Include id for join with daily std */
 		from &me_data.
-		where not missing(gvkey) and primary_sec=1 and not missing(me_company) and common=1 and obs_main=1
+		where not missing(gvkey) and primary_sec=1 and not missing(me_company) and common=1 and obs_main=1 /* Notice, exch_main is not a requirement */
 		group by gvkey, eom
 		having me_company=max(me_company);
 	quit;

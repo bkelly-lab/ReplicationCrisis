@@ -36,7 +36,8 @@ proc sql noprint;
 	select distinct lowcase(name) into :chars separated by ' '
 	from dictionary.columns
 	where lowcase(libname)='scratch' and lowcase(memname)='world_data'
-		and name not in ('id', 'source', 'size_grp', 'obs_main', 'primary_sec', 'gvkey', 'iid', 'permno', 'permco', 'excntry', 'curcd', 'fx', 
+		and name not in ('id', 'source', 'size_grp', 'obs_main', 'exch_main', 'primary_sec', 'gvkey', 'iid', 'permno', 'permco', 'excntry', 'curcd', 'fx',
+		'sic', 'naics', 'gics', 'ff49',
 		'common', 'comp_tpci', 'crsp_shrcd', 'comp_exchg', 'crsp_exchcd', 'crsp_sic', 'date', 'eom', 'adjfct', 'shares', 'me', 'me_lag',
 		'me_company', 'prc_local', 'dolvol', 'ret', 'ret_local', 'ret_exc', 'ret_lag_dif'); /* Notice that I include prc as a characteristic*/
 quit;
@@ -74,7 +75,7 @@ proc sort data=world3 out=world3; by id eom; run;
 %macro prepare_lags(data=,__char=, max_horizon=);
 	* Start Empty Dataset for Tidy Format;
 	data __pf1;
-		format id $char20. eom YYMMDDN8. ret_exc 16.8 ret_lag_dif 8.0 lags 8.0 obs_main_l 1.0 common_l 1.0 primary_sec_l 1.0 
+		format id $char20. eom YYMMDDN8. ret_exc 16.8 ret_lag_dif 8.0 lags 8.0 obs_main_l 1.0 exch_main_l 1.0 common_l 1.0 primary_sec_l 1.0 
 		    comp_exchg_l 8.0 crsp_exchcd_l 8.0
 			excntry_l $3. size_grp_l $char8. me_l 20.12 me_cap_l 20.12 signal_l 20.12;
 		stop;  
@@ -82,11 +83,11 @@ proc sort data=world3 out=world3; by id eom; run;
 	
 	%do lags=1 %to &max_horizon.;
 		data __signals; 
-			set &data.(keep= source id eom ret_exc ret_lag_dif obs_main common primary_sec 
+			set &data.(keep= source id eom ret_exc ret_lag_dif obs_main exch_main common primary_sec 
 							 comp_exchg crsp_exchcd excntry size_grp me me_cap &__char.);
 			by id;
 			lags = &lags.;
-			%let cols_lag = obs_main common primary_sec comp_exchg crsp_exchcd excntry size_grp me me_cap;
+			%let cols_lag = obs_main exch_main common primary_sec comp_exchg crsp_exchcd excntry size_grp me me_cap;
 			%do i=1 %to %nwords(&cols_lag.); 
 				%let col = %scan(&cols_lag., &i, %str(' '));
 				&col._l = lag&lags.(&col.);
@@ -96,7 +97,7 @@ proc sort data=world3 out=world3; by id eom; run;
 		    signal_l = lag&lags.(&__char);
 			if id ^= lag&lags.(id) or source ^= lag&lags.(source) or intck("month", lag&lags.(eom), eom)^=&lags. then
 					signal_l = .;
-		    keep id eom ret_exc ret_lag_dif lags obs_main_l common_l primary_sec_l comp_exchg_l crsp_exchcd_l excntry_l size_grp_l me_l me_cap_l signal_l;
+		    keep id eom ret_exc ret_lag_dif lags obs_main_l exch_main_l common_l primary_sec_l comp_exchg_l crsp_exchcd_l excntry_l size_grp_l me_l me_cap_l signal_l;
 		run;
 		proc append base=__pf1 data=__signals; run;
 	%end;
@@ -106,7 +107,7 @@ proc sort data=world3 out=world3; by id eom; run;
 		create table __pf2 as
 		select *
 		from __pf1
-		where obs_main_l = 1 and common_l = 1 and primary_sec_l = 1 and ret_lag_dif = 1 and not missing(ret_exc) and not missing(me_l) and not missing(signal_l)
+		where obs_main_l = 1 and exch_main_l = 1 and common_l = 1 and primary_sec_l = 1 and ret_lag_dif = 1 and not missing(ret_exc) and not missing(me_l) and not missing(signal_l)
 		order by excntry_l, size_grp_l, eom, lags;
 	quit;
 %mend;
@@ -379,7 +380,7 @@ proc sort data=world3 out=world3; by id eom; run;
 data world_sub; 
 	set world3;
 	keep source id eom ret_exc ret_lag_dif 
-		obs_main common primary_sec comp_exchg 
+		obs_main exch_main common primary_sec comp_exchg 
 		crsp_exchcd excntry size_grp me me_cap 
 		&chars_lvl1.;
 run;

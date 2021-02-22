@@ -235,15 +235,9 @@ Importantly, a given company (gvkey) can potentially have up to 3 primary securi
 %mend add_primary_sec;
 
 /* MACRO - COMPUSTAT EXCHANGES */*
-	The macro returns a daily and monthly dataset with summary statistics of trading for each exchg.
- 	The macro take two arguments:
-		- wins_perc determines the winsorization percentile to applied to daily/monthly dollar volume within an exchange. 
-		  This is implemented to avoid outliers but will downward bias the states dollar volumes since the disproportionally censors large firms 
-		- min_dolvol_share i an argument in [0,1] that determines the minimum share of dollar volume within a country an exchange has to have to be called a main_exchange.
-		  Bessembinder et al (2020) uses 0.02. However, this will exclude small cap exchanges such as NYSE American and TSX Venture Exchange. I therefore prefer to use 0 and therefore include all ordinary exchanges as "main exchanges".
+	This macro returns a dataset with classifications of individual exchanges in terms of country and an indicator of whether it's a normal or special exchange
 ;
-
-%macro comp_exchanges(wins_perc=1, min_dolvol_share=0); 
+%macro comp_exchanges(out=); 
 	/* Exchange Classification */
 	/* What about 153? . Could consider excluding 111 since its the same securities traded on 110. This is just due to a rule in Thailand limiting the ownership of foreign investors in Thailand https://thaishares.com/nvdr/*/
 	%let special_exchanges =
@@ -252,6 +246,7 @@ Importantly, a given company (gvkey) can potentially have up to 3 primary securi
 			2, 
 			3, 
 			4, 
+			15, 16, 17, 18, 21, /* US exchanges not in NYSE, Amex and NASDAQ */
 			13, 
 			19, 
 			20, 
@@ -286,7 +281,7 @@ Importantly, a given company (gvkey) can potentially have up to 3 primary securi
 			case 
 				when count(excntry)>1 then 'multi_national' /*, calculated count > 1 as multi_national*/
 				else excntry
-			end as ex_country
+			end as excntry
 		from __ex_country1
 		where not missing(excntry) and not missing(exchg)
 		group by exchg;
@@ -295,128 +290,13 @@ Importantly, a given company (gvkey) can potentially have up to 3 primary securi
 		select a.*, b.exchgdesc
 		from __ex_country2 as a left join comp.r_ex_codes as b
 		on a.exchg=b.exchgcd;
+		
+		create table &out. as 
+		select *, (excntry ^= 'multi_national' and exchg not in &special_exchanges.) as exch_main
+		from __ex_country3;
 	quit;
 	
-	/* FX Table*/
-	%compustat_fx(out=__fx); 
-	
-	proc sql;
-		/* Dollar Volume from Security Daily */
-		create table __sec_daily1 as
-		select gvkey, iid, datadate, tpci, exchg, curcdd, prccd/qunit as prccd, cshtrd
-		from comp.g_secd /*(firstobs=1 obs=10000000)*/
-		where not missing(prccd)
-		outer union corr
-		select gvkey, iid, datadate, tpci, exchg, curcdd, prccd, cshtrd
-		from comp.secd /*(firstobs=1 obs=10000000)*/
-		where not missing(prccd);
-		
-		create table __sec_daily2 as
-		select a.gvkey, a.iid, a.tpci, a.exchg, a.datadate, intnx('month', datadate,0,'E') as eom format=YYMMDDN8., a.prccd*b.fx*a.cshtrd/1e6 as dolvol
-		from __sec_daily1 as a 
-		left join __fx as b
-			on a.datadate=b.date and a.curcdd=b.curcdd;
-		
-		/* Monthly Dollar Volume - Combine SECM and SEC_DAILY*/
-		create table __secm1 as
-		select a.gvkey, a.iid, a.tpci, a.exchg, intnx('month', a.datadate,0,'E') as eom format=YYMMDDN8.,  
-			a.prccm*b.fx*a.cshtrm/1e6 as dolvol 
-		from comp.secm as a left join __fx as b
-		on a.datadate=b.date and a.curcdm=b.curcdd
-		where not missing(a.prccm);
-		
-		create table __sec_monthly1 as 
-		select gvkey, iid, tpci, exchg, eom, sum(dolvol) as dolvol
-		from __sec_daily2 
-		group by gvkey, iid, eom, tpci, exchg;
-		
-		create table __sec_monthly2 as 
-		select *, 'd' as freq from __sec_monthly1
-		outer union corr
-		select *, 'm' as freq from __secm1;  
-	quit;
-	
-	/* When duplicate observations, prefer SECM. Inspection shows that SECM is more accurate than SECD */
-	proc sort data=__sec_monthly2; by gvkey iid eom descending freq; run; 
-	data __sec_monthly3;
-		set __sec_monthly2;
-		by gvkey iid eom; 
-		if first.eom; 
-	run;
-	
-	%macro exchange_summary(data=, out=, date_var=);
-		/* Winsorize Dollar Volume to Account for Outliers */
-		%winsorize(inset=&data., outset=__sec1, sortvar=exchg &date_var., vars=dolvol, perc1=&wins_perc.); 
-		
-		/* Add Common Stocks Indicator as a Helper Variable*/
-		data __sec2; 
-			set __sec1; 
-			if tpci='0' then cs=1; else cs=0;  
-		run; 
-		
-		/* Create Exchange Statistics Monthly */
-		proc sql;
-			create table __exchanges1 as 
-			select exchg, &date_var., count(*) as n, sum(cs) as n_cs, sum(dolvol) as dolvol, sum(dolvol*cs) as dolvol_cs
-			from __sec2
-			where not missing(exchg)
-			group by exchg, &date_var.;
-			
-			create table __exchanges2 as 
-			select a.*, b.ex_country, b.exchgdesc
-			from __exchanges1 as a 
-			left join __ex_country3 as b
-				on a.exchg=b.exchg;
-				
-			/* Classify Exchange */
-			create table __exchanges3 as 
-			select *, 
-				case 
-					when exchg in &special_exchanges. or ex_country='multi_national' then 'special'
-					else 'ordinary'  /* I use case when if we want to extend the number of categories in the future */
-				end as exch_type
-			from __exchanges2;
-			
-			/* Share of Common Stock Volume within a Country's Ordinary Exchanges*/
-			create table __exchanges4 as
-			select *, dolvol_cs/sum(dolvol_cs) as dolvol_share
-			from __exchanges3
-			group by ex_country, exch_type, &date_var.;
-			
-			update __exchanges4
-			set dolvol_share = .
-			where exch_type ^= 'ordinary';
-		quit;
-		
-		/* Output */
-		proc sort data=__exchanges4 out=&out nodupkey; by exchg &date_var.; run;
-		
-		proc delete data=__sec1 __sec2 __exchanges1 __exchanges2 __exchanges3 __exchanges4; run;
-	%mend;
-	
-	%exchange_summary(data=__sec_monthly3, out=__exchanges_monthly1, date_var=eom);
-	%exchange_summary(data=__sec_daily2, out=exchanges_daily, date_var=datadate);
-	
-	/* Add Main Exchange Indicator to the Monthly Exchange File */
-	proc sql;
-		create table __exchanges_monthly2 as 
-		select *, mean(missing(dolvol_share)) as dolvol_miss_frac /* CSHTRD is missing in the early years of many countries. We therefore tag all exchange as the main exchanges if there is no dollar volume available for the country-eom pair*/
-		from __exchanges_monthly1
-		group by ex_country, eom; 	
-		
-		create table exchanges_monthly as 
-		select exchg, exchgdesc, exch_type, ex_country, eom, n, n_cs, dolvol, dolvol_cs, dolvol_share,
-			case 
-				when exch_type = 'ordinary' and (dolvol_share>=&min_dolvol_share. or dolvol_miss_frac=1) and n_cs>=10 then 1 /* The Dollar Requirement from Bessembinder is 2% but that removes a lot of small cap exchanges*/
-				else 0
-			end as main_exchange
-		from __exchanges_monthly2
-		order by exchg, eom;
-	quit;
-	
-	proc delete data= __ex_country1 __ex_country2 __ex_country3 __fx __sec_daily1 __sec_daily2
-		__secm1 __sec_monthly1 __sec_monthly2 __sec_monthly3
-		__exchanges_monthly1 __exchanges_monthly2 __exchanges_monthly3; run;
+	proc delete data= __ex_country1 __ex_country2 __ex_country3; run;
 %mend comp_exchanges;
 
 **********************************************************************************************************************
@@ -430,7 +310,8 @@ Importantly, a given company (gvkey) can potentially have up to 3 primary securi
 		   a.ret, a.retx, a.cfacshr, a.vol, 
 		   case when a.prc > 0 and a.askhi > 0 then a.askhi else . end as prc_high,  /* Highest price when prc is not the bid-ask average: https://wrds-web.wharton.upenn.edu/wrds/query_forms/variable_documentation.cfm?vendorCode=CRSP&libraryCode=crspa&fileCode=dsf&id=askhi*/
 		   case when a.prc > 0 and a.bidlo > 0 then a.bidlo else . end as prc_low,    /* Lowest price when prc is not the bid-ask average: https://wrds-web.wharton.upenn.edu/wrds/query_forms/variable_documentation.cfm?vendorCode=CRSP&libraryCode=crspa&fileCode=dsf&id=bidlo */
-		   b.shrcd, b.exchcd, c.gvkey, c.liid as iid, c.linkprim in ('P', 'C') as primary_sec /*http://www.crsp.org/products/documentation/crspccmlink-security-link-history*/
+		   b.shrcd, b.exchcd, c.gvkey, c.liid as iid, c.linkprim in ('P', 'C') as primary_sec, /*http://www.crsp.org/products/documentation/crspccmlink-security-link-history*/
+		   b.exchcd in (1, 2, 3) as exch_main			
 		from crsp.&freq.sf as a 
 		left join crsp.&freq.senames as b
 		   on a.permno=b.permno and a.date>=namedt and a.date<=b.nameendt
@@ -813,15 +694,12 @@ Importantly, a given company (gvkey) can potentially have up to 3 primary securi
 		quit;
 		
 		/* Add Exchange Information*/
-		data __excntry;
-			set comp.security comp.g_security;
-		run;
-		
+		%comp_exchanges(out=__exchanges);
 		proc sql;
 			create table __comp_sf5 as
-			select a.*, b.excntry
-			from __comp_sf4 as a left join __excntry as b
-			on a.gvkey=b.gvkey and a.iid=b.iid;
+			select a.*, b.excntry, b.exch_main 
+			from __comp_sf4 as a left join __exchanges as b
+			on a.exchg=b.exchg;
 		quit;
 		
 		/* Add Primary Security Indicator?*/
@@ -846,15 +724,15 @@ Importantly, a given company (gvkey) can potentially have up to 3 primary securi
 	/* Monthly Files */
 	proc sql;
 		create table __msf_world1 as
-		select cats('crsp_',permno) as id length=20, permno, permco, gvkey, iid, 'USA' as excntry length=3, (shrcd in (10, 11, 12)) as common, bidask,
-			shrcd as crsp_shrcd, exchcd as crsp_exchcd, '' as comp_tpci, . as comp_exchg, primary_sec,
+		select cats('crsp_',permno) as id length=20, permno, permco, gvkey, iid, 'USA' as excntry length=3, exch_main, (shrcd in (10, 11, 12)) as common,  primary_sec,
+			bidask, shrcd as crsp_shrcd, exchcd as crsp_exchcd, '' as comp_tpci, . as comp_exchg,
 			'USD' as curcd, 1 as fx, date, intnx('month',date,0,'E') as eom format=YYMMDDN8., 
 		   	cfacshr as adjfct, shrout as shares, me, me_company, prc, prc as prc_local, prc_high, prc_low, dolvol, vol as tvol, 
 		   	ret, ret as ret_local, ret_exc, 1 as ret_lag_dif, div_tot, . as div_cash, . as div_spc, 'CRSP' as source length=9 
 		from &crsp_msf.
 		outer union corr
-		select cats('comp_',gvkey,'_',iid) as id length=20, . as permno, . as permco, gvkey, iid, excntry, (tpci='0') as common, (prcstd = 4) as bidask,
-			. as crsp_shrcd, . as crsp_exchcd, tpci as comp_tpci, exchg as comp_exchg, primary_sec,
+		select cats('comp_',gvkey,'_',iid) as id length=20, . as permno, . as permco, gvkey, iid, excntry, exch_main, (tpci='0') as common, primary_sec,
+			(prcstd = 4) as bidask, . as crsp_shrcd, . as crsp_exchcd, tpci as comp_tpci, exchg as comp_exchg, 
 		   	curcdd as curcd, fx, datadate as date, eom, 
 		   	ajexdi as adjfct, cshoc as shares, me, me as me_company, prc, prc_local, prc_high, prc_low, dolvol, cshtrm as tvol,
 		   	ret_local, ret, ret_exc, ret_lag_dif, div_tot, div_cash, div_spc, 'COMPUSTAT' as source  
@@ -873,14 +751,14 @@ Importantly, a given company (gvkey) can potentially have up to 3 primary securi
 	/* Daily Files */
 	proc sql;
 		create table __dsf_world1 as
-		select cats('crsp_',permno) as id length=20, 'USA' as excntry length=3, (shrcd in (10, 11, 12)) as common, bidask,
-			primary_sec, 'USD' as curcd, 1 as fx, date, intnx('month',date,0,'E') as eom format=YYMMDDN8., 
+		select cats('crsp_',permno) as id length=20, 'USA' as excntry length=3, exch_main, (shrcd in (10, 11, 12)) as common, primary_sec, 
+			bidask, 'USD' as curcd, 1 as fx, date, intnx('month',date,0,'E') as eom format=YYMMDDN8., 
 		   	cfacshr as adjfct, shrout as shares, me, dolvol, vol as tvol, prc, prc_high, prc_low,
 		   	ret as ret_local, ret, ret_exc, 1 as ret_lag_dif 
 		from &crsp_dsf.
 		outer union corr
-		select cats('comp_',gvkey,'_',iid) as id length=20, excntry, (tpci='0') as common, (prcstd = 4) as bidask,
-			primary_sec, curcdd as curcd, fx, datadate as date, intnx('month',datadate,0,'E') as eom format=YYMMDDN8., 
+		select cats('comp_',gvkey,'_',iid) as id length=20, excntry, exch_main, (tpci='0') as common, primary_sec, 
+			(prcstd = 4) as bidask, curcdd as curcd, fx, datadate as date, intnx('month',datadate,0,'E') as eom format=YYMMDDN8., 
 		   	ajexdi as adjfct, cshoc as shares, me, dolvol, cshtrd as tvol, prc, prc_high, prc_low,
 		   	ret_local, ret, ret_exc, ret_lag_dif  
 		from &comp_dsf.;
@@ -898,7 +776,7 @@ Importantly, a given company (gvkey) can potentially have up to 3 primary securi
 		select a.*, b.obs_main
 		from __msf_world2 as a left join __obs_main as b
 		on a.id = b.id and a.eom = b.eom;
-		
+	
 		create table __dsf_world2 as 
 		select a.*, b.obs_main
 		from __dsf_world1 as a left join __obs_main as b
@@ -924,7 +802,7 @@ Importantly, a given company (gvkey) can potentially have up to 3 primary securi
 	/* Create Index Data */
 	proc sql;
 		create table __common_stocks1 as
-		select distinct id, date, eom, excntry, obs_main, primary_sec, common, ret_lag_dif, me, dolvol, ret, ret_local, ret_exc
+		select distinct id, date, eom, excntry, obs_main, exch_main, primary_sec, common, ret_lag_dif, me, dolvol, ret, ret_local, ret_exc
 		from &data.
 		order by id, &dt_col.;
 	quit;
@@ -956,7 +834,7 @@ Importantly, a given company (gvkey) can potentially have up to 3 primary securi
 			sum(ret_exc*me_lag1)/(calculated me_lag1) as mkt_vw_exc,
 			mean(ret_exc) as mkt_ew_exc
 		from __common_stocks3
-		where obs_main = 1 and primary_sec = 1 and common = 1 and ret_lag_dif <= &max_date_lag. and not missing(me_lag1) and not missing(ret_local) 
+		where obs_main = 1 and exch_main = 1 and primary_sec = 1 and common = 1 and ret_lag_dif <= &max_date_lag. and not missing(me_lag1) and not missing(ret_local) 
 		group by excntry, &dt_col.;
 	quit;
 	%if &freq.=m %then %do;
@@ -979,7 +857,7 @@ Importantly, a given company (gvkey) can potentially have up to 3 primary securi
 - Classify each stocks into one of five size groups based on their end of month market cap relative to NYSE breakpoints;
 %macro nyse_size_groups(out=, data=);
 	proc sort data=&data.(where=(
-		(crsp_exchcd=1 or comp_exchg=11) and obs_main = 1 and primary_sec = 1 and common = 1 and ret_lag_dif = 1 and not missing(me) and not missing(ret_exc)
+		(crsp_exchcd=1 or comp_exchg=11) and obs_main = 1 and exch_main = 1 and primary_sec = 1 and common = 1 and ret_lag_dif = 1 and not missing(me) and not missing(ret_exc)
 	) ) out=nyse_stocks; by eom; run;
 	
 	proc means data=nyse_stocks noprint;
@@ -1002,7 +880,7 @@ Importantly, a given company (gvkey) can potentially have up to 3 primary securi
 	quit;
 %mend;
 
-* MACRO: AP_FACTORS_DAILY
+* MACRO: AP_FACTORS
 - This macro creates the factors from the 3-factors model of Fama and French (1993)
   as well as the factors from the 4-factor of Hou, Xue and Zhang (2015).
   Factors other than market and small minus big, are created using an unconditional double sort on sort and the underlying characteristics
@@ -1044,7 +922,7 @@ Importantly, a given company (gvkey) can potentially have up to 3 primary securi
 	proc sql;
 		create table base1 as 
 		select id, eom, size_grp, excntry, me, market_equity, be_me, at_gr1, niq_be,
-			source, obs_main, common, comp_exchg, crsp_exchcd, primary_sec, ret_lag_dif
+			source, exch_main, obs_main, common, comp_exchg, crsp_exchcd, primary_sec, ret_lag_dif
 		from &mchars.;
 	quit;
 	
@@ -1054,7 +932,7 @@ Importantly, a given company (gvkey) can potentially have up to 3 primary securi
 	
 	%macro temp();
 	/* Lag variables used at portfolio rebalacing */
-	%let cols_lag = comp_exchg crsp_exchcd obs_main common primary_sec excntry size_grp me be_me at_gr1 niq_be;
+	%let cols_lag = comp_exchg crsp_exchcd exch_main obs_main common primary_sec excntry size_grp me be_me at_gr1 niq_be;
 	data base3; 
 		set base2;
 		by id eom;
@@ -1078,7 +956,7 @@ Importantly, a given company (gvkey) can potentially have up to 3 primary securi
 					else 'small'
 				end as size_pf
 		from base3
-		where obs_main_l = 1 and common_l = 1 and primary_sec_l = 1 and ret_lag_dif = 1 and not missing(me_l)
+		where obs_main_l = 1 and exch_main_l = 1 and common_l = 1 and primary_sec_l = 1 and ret_lag_dif = 1 and not missing(me_l)
 		order by excntry_l, size_grp_l, eom;
 	quit;
 	
@@ -1216,7 +1094,7 @@ Importantly, a given company (gvkey) can potentially have up to 3 primary securi
 	
 	* Reorder Variables;
 	data main_data2;
-		retain id date eom source size_grp obs_main primary_sec gvkey iid permno permco excntry curcd fx 
+		retain id date eom source size_grp obs_main exch_main primary_sec gvkey iid permno permco excntry curcd fx 
 			common comp_tpci crsp_shrcd comp_exchg crsp_exchcd
 			adjfct shares me me_lag1; 
 		set main_data1;
@@ -1227,7 +1105,7 @@ Importantly, a given company (gvkey) can potentially have up to 3 primary securi
 		create table main_data3 as
 		select * 
 		from main_data2
-		where primary_sec = 1 and common = 1 and obs_main = 1 and not missing(me_lag1) and ret_lag_dif = 1 and not missing(ret_exc) and eom <= '31DEC2019'd;
+		where primary_sec = 1 and common = 1 and obs_main = 1 and exch_main = 1 and not missing(me_lag1) and ret_lag_dif = 1 and not missing(ret_exc) and eom <= '31DEC2019'd;
 	quit;
 	
 	proc sql noprint;
