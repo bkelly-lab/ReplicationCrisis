@@ -5,7 +5,7 @@ This change log keeps track of changes to the underlying dataset. In brackets, w
 
 __Changes__:
 
-- We failed to exclude certain securities that where only traded over the counter. In the new version of the dataset, we include an indicator column "exch_main", to exclude non-standard exchanges. In the US, main exchanges are AMEX, NASDAQ and NYSE. Outside of the US, we exclude over the counter exchanges, stock connect exchanges in China and cross-country exchanges such as BATS Chi-X Europe. The documentation includes a full list of the excluded exchanges.  
+- Previously we did not exclude securities that are only traded over the counter. In the new version of the dataset, we include an indicator column "exch_main" to exclude non-standard exchanges. In the US, the main exchanges are AMEX, NASDAQ and NYSE. Outside of the US, we exclude over the counter exchanges, stock connect exchanges in China and cross-country exchanges such as BATS Chi-X Europe. The documentation includes a full list of the excluded exchanges.  
 - Included SIC, NAICS and GICS industry codes.
 
 __Impact__:
