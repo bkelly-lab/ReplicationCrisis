@@ -648,3 +648,73 @@
 	proc sort data=op_ep out=&out. nodup; by gvkey curcd datadate; run; 
 	proc delete data= __acc1 __acc2 __acc3 __acc4  dates_apply calc_dates calc_data month_ends __earn_pers1 __earn_pers2 op_ep; run;
 %mend;
+
+/* MACRO - FIRM AGE */
+%macro firm_age(data=, out=);
+	* CRSP first observation;
+	proc sql;
+		create table crsp_age1 as 
+		select permco, min(date) as crsp_first format=YYMMDDN8.
+		from crsp.msf
+		group by permco;
+	quit;
+	
+	* Compustat accounting first observation;
+	proc sql;
+		create table comp_acc_age1 as
+		select gvkey, datadate from comp.funda
+		outer union corr
+		select gvkey, datadate from comp.g_funda;
+		
+		create table comp_acc_age2 as
+		select gvkey, min(datadate) as comp_acc_first format=YYMMDDN8.
+		from comp_acc_age1
+		group by gvkey;
+		
+		update comp_acc_age2
+		set comp_acc_first = intnx('year', comp_acc_first, -1, 'e');  /* When submitting an annual report, the firm must have existed for at least 1 year*/
+	quit; 
+	
+	* Compustat return first obs;
+	proc sql;
+		create table comp_ret_age1 as
+		select gvkey, datadate from comp.secm
+		outer union corr
+		select gvkey, datadate from comp.g_secd where monthend=1;
+		
+		create table comp_ret_age2 as
+		select gvkey, min(datadate) as comp_ret_first format=YYMMDDN8.
+		from comp_ret_age1
+		group by gvkey;
+		
+		update comp_ret_age2
+		set comp_ret_first = intnx('year', comp_ret_first, -1, 'e');  /* When submitting an annual report, the firm must have existed for at least 1 year*/
+	quit; 
+	
+	* Add to Dataset;
+	proc sql;
+		create table comb1 as
+		select a.id, a.eom, min(b.crsp_first, c.comp_acc_first, d.comp_ret_first) as first_obs format=YYMMDDN8.
+		from &data. as a 
+		left join crsp_age1 as b 
+		on a.permco=b.permco
+		left join comp_acc_age2 as c
+		on a.gvkey=c.gvkey
+		left join comp_ret_age2 as d
+		on a.gvkey=d.gvkey;
+	
+		create table comb2 as 
+		select *, min(eom) as first_alt format=YYMMDDN8. /* A few (0.3% of all obs) north american observations don't have observations in comp.secm so this is a fall back option*/
+		from comb1
+		group by id; 
+	
+		create table comb3 as
+		select *, intck ('month', min(first_obs, first_alt), eom) as age
+		from comb2;
+		
+		alter table comb3
+		drop first_obs, first_alt;
+	quit;
+	* Output;
+	proc sort data=comb3 out=&out.; by id eom; run;
+%mend;

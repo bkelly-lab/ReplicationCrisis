@@ -97,10 +97,9 @@
 	/* Income/CF Fundamentals to Market Enterprise Value */
 	gp_mev ebitda_mev ebit_mev cop_mev sale_mev ocf_mev fcf_mev fincf_mev
 	
-	
 	/* New Variables from HXZ */ 
 	ni_inc8q ppeinv_gr1a lnoa_gr1a capx_gr1 capx_gr2 capx_gr3 sti_gr1a
-	niq_at niq_at_chg1 niq_be niq_be_chg1 saleq_gr1 rd5_at age
+	niq_at niq_at_chg1 niq_be niq_be_chg1 saleq_gr1 rd5_at
 	dsale_dinv dsale_drec dgp_dsale dsale_dsga
 	saleq_su niq_su debt_me netdebt_me capex_abn inv_gr1 be_gr1a
 	op_at pi_nix op_atl1 gp_atl1 ope_bel1 cop_atl1
@@ -194,8 +193,8 @@ Description:
 		eqnetis_x		= sum(eqis_x,-eqbb_x);  /* Net Equity Issuance. Using sum means that the variable will be computed as long as one of the inputs are non-missing */
 		eqpo_x			= div_x+eqbb_x;  /* Net Equity Payout= Div+Buyback-Issuance*/
 		eqnpo_x			= div_x-eqnetis_x;  /* Net Equity Payout= Div+Buyback-Issuance*/
-		dltnetis_x		= coalesce(sum(ds,-dltr), ltdch, dif12(dltt)); /* Net Long Term Debt issuance. GLOBAL firms only have LTDCH, NA firms only have DS and DLTR. If cash flow items are missing. Approximate by the change in long term book debt */
-		if missing(ds) and missing(dltr) and missing(ltdch) and count<=12 then
+		dltnetis_x		= coalesce(sum(dltis,-dltr), ltdch, dif12(dltt)); /* Net Long Term Debt issuance. GLOBAL firms only have LTDCH, NA firms only have dltis and DLTR. If cash flow items are missing. Approximate by the change in long term book debt */
+		if missing(dltis) and missing(dltr) and missing(ltdch) and count<=12 then
 			dltnetis_x	= .; 
 		dstnetis_x		= coalesce(dlcch, dif12(dlc)); /* Prefer dlcch. If this is missing, approximate by the change in short term book debt */
 		if missing(dlcch) and count<=12 then
@@ -290,7 +289,7 @@ Description:
 		oancf ibc dpc xidoc capx ibc dpc wcapt
 		
 		/* Financing */
-		fincf fiao txbcof ltdch ds dltr dlcch purtshr prstkc sstk
+		fincf fiao txbcof ltdch dltis dltr dlcch purtshr prstkc sstk
 		dv dvc
 	;
 	%let avars_bs =
@@ -606,16 +605,7 @@ Description:
 	%mend apply_to_lasty;
 	
 	/* Start Procedure */
-	
-	/* First obs (used for firm age) */
-	proc sql;
-		create table __chars2 as 
-		select *, min(datadate) as first_obs format=YYMMDDN8.
-		from &data.
-		group by gvkey;
-	quit;
-	
-	proc sort data=__chars2 out=__chars3; by gvkey curcd datadate; run;
+	proc sort data=&data. out=__chars3; by gvkey curcd datadate; run; /* deleted _chars1 and __chars2 steps*/
 	
 	data __chars4;
 		set __chars3;
@@ -1185,7 +1175,7 @@ Description:
 	data __chars16;
 		retain source gvkey datadate public_date assets sales book_equity net_income enterprise_value;
 		set __chars15;
-		keep source gvkey public_date datadate first_obs &__keep_vars.;
+		keep source gvkey public_date datadate &__keep_vars.;
 	run;
 
 	* Add suffix if specified;
@@ -1201,7 +1191,7 @@ Description:
 	%end;
 	
 	proc sort nodupkey data=__chars16 out=&out.; by gvkey public_date; run;
-	proc delete data= __chars2 __chars3 __chars4 __chars5 __chars6 __chars7 __chars8 
+	proc delete data= __chars3 __chars4 __chars5 __chars6 __chars7 __chars8 
 	__chars9 __chars10 __chars11 __chars12 __chars13 __chars14 __chars15 __chars16 __me_data __me_data1 __fx earnings_pers; run;
 %mend create_acc_chars;
 
@@ -1209,7 +1199,7 @@ Description:
 %macro combine_ann_qtr_chars(out=, ann_data=, qtr_data=, __char_vars=, q_suffix=);
 	proc sql;
 		create table __acc_chars1 as 
-		select a.*, b.*, b.first_obs as first_obs_qtr 
+		select a.*, b.*
 		from &ann_data. as a left join &qtr_data. as b
 		on a.gvkey=b.gvkey and a.public_date=b.public_date;
 	quit;
@@ -1217,11 +1207,6 @@ Description:
 	/* Substitute Annual Characteristic for Quarterly if Quarterly is more recent */
 	data __acc_chars2;
 		set __acc_chars1;
-		* Firm Age;
-		first_obs_overall = min(first_obs, first_obs_qtr); * first_obs is the minimum in either annual or quarterly data;
-		age = intck('MONTH', first_obs_overall, public_date);
-		age&q_suffix. = age; 
-		drop  first_obs first_obs_qtr first_obs_overall; 
 		%do i=1 %to %nwords(&__char_vars.);
 			%let ann_var = %scan(&__char_vars., &i.);
 			%let qtr_var = &ann_var.&q_suffix.;

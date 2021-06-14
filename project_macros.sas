@@ -71,6 +71,35 @@
 
 %mend winsorize_own;
 
+/* MACRO: CRSP RETURN CUTOFFS
+	The output of the macro is the 0.1%, 1%, 99% and 99.9% percentile of excess returns in CRSP.
+	The idea is to use it as a sanity check for Compustat returns
+*/
+%macro crsp_return_cutoffs(data=, out=);
+	proc sort data=&data.(where=(source='CRSP')) out=base; by eom; run;
+	proc univariate data=base noprint;
+	  by eom;
+	  var ret_exc;
+	  output out=&out. pctlpts=0.1 1 99 99.9 pctlpre=ret_exc_;
+	run;
+%mend;
+
+/* MACRO: NYSE SIZE CUTOFFS
+	Used for determining size groups and me cap weights
+*/
+%macro nyse_size_cutoffs(data=, out=);
+	proc sort data=&data.(where=(
+		crsp_exchcd=1 and obs_main = 1 and exch_main = 1 and primary_sec = 1 and common = 1 and not missing(me))) 
+		out=nyse_stocks; 
+		by eom; 
+	run;
+	
+	proc means data=nyse_stocks noprint;
+		by eom;
+		var me;
+		output out=&out.(drop=_type_ _freq_) N=n P1=nyse_p1 p20 = nyse_p20 P50=nyse_p50 p80 = nyse_p80;
+	run;
+%mend;
 
 /* Flexible version of WRDS populate function which can also do daily frequency */
 %macro populate_own(inset=, outset=, datevar=, idvar=, datename=, forward_max=, period=); /* Period in ('day', 'month') */
@@ -719,7 +748,7 @@ Importantly, a given company (gvkey) can potentially have up to 3 primary securi
 		__comp_sf1 __comp_sf2 __comp_sf3 __comp_sf4 __comp_sf5 __comp_sf6 __excntry &base.; *run;
 %mend prepare_comp_sf;
 
-/* COMBINE CRSP AND COMPUSTAT MONTHLY WITH CRSP PREFERENCE*/
+/* COMBINE CRSP AND COMPUSTAT WITH CRSP PREFERENCE*/
 %macro combine_crsp_comp_sf(out_msf=, out_dsf=, crsp_msf=, comp_msf=, crsp_dsf=, comp_dsf=);
 	/* Monthly Files */
 	proc sql;
@@ -789,20 +818,40 @@ Importantly, a given company (gvkey) can potentially have up to 3 primary securi
 	proc delete data= __msf_world1 __msf_world2 __msf_world3 __dsf_world1 __dsf_world2; run; 
 %mend combine_crsp_comp_sf;
 
-* MACRO: MARKET RETURNS;
-%macro market_returns(out=, data=, freq=m, wins=0.1);
+* MACRO: CLEAN_COMP_MSF
+	- Remove obvious Compustat data errors by setting return to missing.
+	- Currently only implemented for monthly Compustat file, should be expanded to daily file
+;
+%macro clean_comp_msf(data=);
+	proc sql;
+		update &data. 
+		set ret=., ret_local=., ret_exc=.
+		where gvkey = '002137' and iid = '01C' and eom in ('31DEC1983'd, '31JAN1984'd);
+		
+		update &data. 
+		set ret=., ret_local=., ret_exc=.
+		where gvkey = '013633' and iid = '01W' and eom in ('28FEB1995'd);
+	quit;
+%mend;
+
+* MACRO: MARKET RETURNS
+	For wins, choose crsp or all for 0.1% winsorization based on CRSP or all data
+;
+%macro market_returns(out=, data=, freq=m, wins=, wins_crsp_data=); 
 	%if &freq.=d %then %do;
 		%let dt_col = date;
 		%let max_date_lag = 14;
+		%let source=; /* We don't currently have source in the daily dataset (including a character column would take a huge amount of space given the number of rows in the daily dataset*/
 	%end;
 	%if &freq.=m %then %do;
 		%let dt_col = eom;
 		%let max_date_lag = 1;
+		%let source=source,;
 	%end;
 	/* Create Index Data */
 	proc sql;
 		create table __common_stocks1 as
-		select distinct id, date, eom, excntry, obs_main, exch_main, primary_sec, common, ret_lag_dif, me, dolvol, ret, ret_local, ret_exc
+		select distinct &source. id, date, eom, excntry, obs_main, exch_main, primary_sec, common, ret_lag_dif, me, dolvol, ret, ret_local, ret_exc
 		from &data.
 		order by id, &dt_col.;
 	quit;
@@ -818,8 +867,31 @@ Importantly, a given company (gvkey) can potentially have up to 3 primary securi
 		end;
 	run;
 	
-	%let wins_high = %sysevalf(100-&wins.);
-	%winsorize_own(inset=__common_stocks2, outset=__common_stocks3, sortvar=eom, vars=me_lag1 dolvol_lag1 ret ret_local ret_exc, perc_low=&wins., perc_high=&wins_high.); /* Notice I do winsorization by eom. Alternatively, we could do it by (excntry, date) but this could result in outliers when a country have few stocks */
+	%if &wins. = crsp %then %do;
+		proc sql;
+			create table __common_stocks3 as
+			select a.*, b.ret_exc_0_1, b.ret_exc_99_9
+			from __common_stocks2 as a 
+			left join &wins_crsp_data. as b
+			on a.eom=b.eom;
+	
+			update __common_stocks3 
+			set ret_exc = ret_exc_99_9
+			where ret_exc > ret_exc_99_9 and source = 'COMPUSTAT' and not missing(ret_exc);
+			
+			update __common_stocks3 
+			set ret_exc = ret_exc_0_1
+			where ret_exc < ret_exc_0_1 and source = 'COMPUSTAT' and not missing(ret_exc);
+			
+			alter table __common_stocks3
+			drop ret_exc_0_1, ret_exc_99_9;
+		quit;
+		
+	%end;
+	%if &wins. = all %then %do;
+		%winsorize_own(inset=__common_stocks2, outset=__common_stocks3, sortvar=eom, vars=ret ret_local ret_exc, perc_low=0.1, perc_high=99.9); /* Notice I do winsorization by eom. Alternatively, we could do it by (excntry, date) but this could result in outliers when a country have few stocks */
+	%end;
+	
 	
 	proc sql;
 		create table mkt1 as
@@ -849,35 +921,6 @@ Importantly, a given company (gvkey) can potentially have up to 3 primary securi
 			having stocks / max(stocks) >= 0.25; /* With less than 25% of stocks trading, it's likely that the date is not an official trading date */
 		quit;
 	%end;
-%mend;
-
-**********************************************************************************************************************
-*  MACRO - Add size group classification based on NYSE stocks                                                        *
-**********************************************************************************************************************
-- Classify each stocks into one of five size groups based on their end of month market cap relative to NYSE breakpoints;
-%macro nyse_size_groups(out=, data=);
-	proc sort data=&data.(where=(
-		(crsp_exchcd=1 or comp_exchg=11) and obs_main = 1 and exch_main = 1 and primary_sec = 1 and common = 1 and ret_lag_dif = 1 and not missing(me) and not missing(ret_exc)
-	) ) out=nyse_stocks; by eom; run;
-	
-	proc means data=nyse_stocks noprint;
-		by eom;
-		var me;
-		output out=nyse_cutoff(drop=_type_ _freq_) N=n P1=nyse_p1 p20 = nyse_p20 P50=nyse_p50 p80 = nyse_p80;
-	run;
-	
-	proc sql;
-		create table &out. as
-		select case 
-				when a.me >= b.nyse_p80 then 'mega'
-				when a.me >= b.nyse_p50 then 'large'
-				when a.me >= b.nyse_p20 then 'small'
-				when a.me >= b.nyse_p1 then 'micro'
-				else 'nano'
-			end as size_grp, a.*
-		from &data. as a left join nyse_cutoff as b
-		on a.eom=b.eom;
-	quit;
 %mend;
 
 * MACRO: AP_FACTORS
@@ -926,9 +969,7 @@ Importantly, a given company (gvkey) can potentially have up to 3 primary securi
 		from &mchars.;
 	quit;
 	
-	%winsorize_own(inset=base1, outset=base2, sortvar=eom, vars=me, perc_low=0.1, perc_high=99.9); /* Winsorize market equity at 0.1% */
-	
-	proc sort data=base2; by id eom; run;
+	proc sort data=base1 out=base2; by id eom; run;
 	
 	%macro temp();
 	/* Lag variables used at portfolio rebalacing */
@@ -1083,7 +1124,7 @@ Importantly, a given company (gvkey) can potentially have up to 3 primary securi
 	- data: should be the path to the main sas dataset
 	- path: path where data is stored. Should be a scratch directory
 ;
-%macro save_main_data_csv(out=, data=, path=);
+%macro save_main_data_csv(out=, data=, path=, end_date=);
 	* Lagged me data;
 	data main_data1;
 		set &data.;
@@ -1105,7 +1146,7 @@ Importantly, a given company (gvkey) can potentially have up to 3 primary securi
 		create table main_data3 as
 		select * 
 		from main_data2
-		where primary_sec = 1 and common = 1 and obs_main = 1 and exch_main = 1 and not missing(me_lag1) and ret_lag_dif = 1 and not missing(ret_exc) and eom <= '31DEC2019'd;
+		where primary_sec = 1 and common = 1 and obs_main = 1 and exch_main = 1 and eom <= &end_date.; /*removed not missing(me_lag1) and and ret_lag_dif = 1 and not missing(ret_exc)*/
 	quit;
 	
 	proc sql noprint;

@@ -59,13 +59,13 @@ proc sort data=scratch.world_data  out=world1; by id eom; run;
 proc sql;
 	create table world2 as
 	select a.*, min(a.me, b.nyse_p80) as me_cap
-	from world1 as a left join project.nyse_cutoff as b
+	from world1 as a left join scratch.nyse_cutoffs as b
 	on a.eom = b.eom
 	order by id, eom;
 quit;
 
 /* Winsorize at 0.1% */
-%winsorize_own(inset=world2, outset=world3, sortvar=eom, vars=ret_exc ret me, perc_low=0.1, perc_high=99.9);
+%winsorize_own(inset=world2, outset=world3, sortvar=eom, vars=ret_exc ret, perc_low=0.1, perc_high=99.9);
 
 proc sort data=world3 out=world3; by id eom; run;
 
@@ -384,7 +384,7 @@ data world_sub;
 		crsp_exchcd excntry size_grp me me_cap 
 		&chars_lvl1.;
 run;
-
+*%hml_func(data=world_sub, __char=f_score, n_pf = 3, max_horizon = 1, bps = 'non_micro');
 %let _timer_start = %sysfunc(datetime());
 	%block_apply(data=world_sub, char_vec = &chars_lvl1., block_size = 10, first_char = 1, last_char = %nwords(&chars_lvl1.), n_pf=3, max_horizon=1, bps='non_micro');  /*last_char=%nwords(&chars_lvl1.)*/
 data _null_;
