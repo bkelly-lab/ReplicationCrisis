@@ -331,8 +331,8 @@ Description:
 	%if &coverage. = 'global' or &coverage. = 'world' %then %do;
 		%let aname = __gfunda;
 		%let qname = __gfundq;
-		%let compcond=indfmt='INDL' and datafmt='HIST_STD' and popsrc='I' and consol='C';
-		data &aname.; /*Find replacements for */
+		%let compcond=indfmt in ('INDL', 'FS') and datafmt='HIST_STD' and popsrc='I' and consol='C';
+		data g_funda1; 
 			set comp.g_funda;
 			where &compcond. and datadate>=&start_date.; 
 			source = 'GLOBAL'; format source $char6.;
@@ -347,10 +347,20 @@ Description:
 			itcb 		= .; /*Only used as substitute for txditc (deffered tax and investment credit)*/
 			xad			= .;
 			txbcof		= .; /* Part of FINCF but will automatically be set to zero*/
-			keep gvkey datadate curcd source &avars. &avars_other.;
+			keep gvkey datadate indfmt curcd source &avars. &avars_other.;
 		run;
+		proc sql;
+			create table &aname. as
+			select *
+			from g_funda1
+			group by gvkey, datadate
+			having count(*)=1 or (count(*)=2 and indfmt='INDL');  /* If the accouting report is available inb both an industrial and financial format, choose financial format (happens very rarely in the international data)*/ 
+			
+			alter table &aname.
+			drop indfmt;
+		quit;
 		
-		data &qname.;
+		data g_fundq1;
 			set comp.g_fundq;
 			where &compcond. and datadate>=&start_date.;
 			source = 'GLOBAL'; format source $char6.;
@@ -369,8 +379,18 @@ Description:
 			xrdq		= .;
 			xrdy		= .;
 			txbcofy		= .; /* Part of FINCF but will automatically be set to zero*/
-			keep gvkey datadate fyr fyearq fqtr curcdq source &qvars.; 
+			keep gvkey datadate indfmt fyr fyearq fqtr curcdq source &qvars.; 
 		run;
+		proc sql;
+			create table &qname. as
+			select *
+			from g_fundq1
+			group by gvkey, datadate
+			having count(*)=1 or (count(*)=2 and indfmt='INDL');  /* If the accouting report is available inb both an industrial and financial format, choose financial format (happens very rarely in the international data)*/ 
+			
+			alter table &qname.
+			drop indfmt;
+		quit;
 	%end;
 	
 	%if &coverage. = 'na' or &coverage. = 'world' %then %do;

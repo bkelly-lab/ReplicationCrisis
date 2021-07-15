@@ -98,7 +98,7 @@ proc sql;
 	left join scratch.acc_chars_world as c
 	on a.gvkey=c.gvkey and a.eom=c.public_date;
 
-	alter table world_data1 
+	alter table scratch.world_data_prelim 
 	drop div_tot, div_cash, div_spc, public_date;
 quit;
 
