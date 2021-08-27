@@ -1,7 +1,16 @@
 # CHANGELOG.md
 This change log keeps track of changes to the underlying dataset. In brackets, we highlight versions of importance. The version with _factor dataset_ is the basis of the factor portfolios we upload at [https://www.bryankellyacademic.org/](https://www.bryankellyacademic.org/). The version with _paper dataset_ is the the basis of the current version of [Jensen, Kelly and Pedersen (2021)](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=3774514).
 
-## 14-06-2021 [Factor Dataset]
+## 27-08-2021 [Paper Dataset][Factor Dataset]
+
+__Changes__:
+- Fixed a bug regarding how daily delisting returns from CRSP is incorporated
+- Added indfmt='FS' to the international accounting data. 
+
+__Impact__:
+- Replication rate: 83.2%
+
+## 14-06-2021 
 
 __Changes__:
 
@@ -10,8 +19,8 @@ __Changes__:
 
 __Impact__:
 
-- Replication rate: 84.0%.
-- The revisions impacted all factors slightly, but the overall results where qualitatively unaffected. 
+- Replication rate: 83.2%.
+- The revisions impacted all factors slightly, but the overall results are qualitatively very similar. 
 
 ## 02-19-2021 
 
@@ -69,7 +78,7 @@ __Impact__:
 - The zero_trades where missing in the developed market because of too few non-missing observations. The developed market zero trades factors are generally strong and the IR ranges from 0.07 to 0.20. Similarly, The Emerging market zero trades factors where slightly negative before. After, the factors are strong with IRs ranging from 0.14 to 0.17. The US market zero trades factors improved slightly. The IR of zero_trades_21d has the most notable increase from 0.05 to 0.09.   
 - The standardized unexpected sales (saleq_su) variable went from a significant IR of 0.12 to an insignificant IR of 0.05. This explains the drop in the replication rate. On the other hand, niq_su increased from 0.11 to 0.19.
 
-## 01-15-2021 [Paper Dataset]
+## 01-15-2021 
 __Changes__:
 
   - Base dataset used in the first online version of Jensen, Kelly and Pedersen (2021).

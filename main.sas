@@ -216,6 +216,6 @@ proc export data=scratch.crsp_return_cutoffs
 run;
 
 * Save main data as .csv files by country;
-%if 1=0 %then %do;
-	%save_main_data_csv(out=world, data=scratch.world_data, path=&scratch_folder./output, end_date='31DEC2020'd); /* CRSP data is only updated anually, so we keep this updating frequency for consistency. Should be incremented everytime there's an update to the CRSP database*/);
+%if 1=1 %then %do;
+	%save_main_data_csv(out=world, data=scratch.world_data, path=&scratch_folder./output, end_date='31DEC2020'd); /* CRSP data is only updated anually, so we keep this updating frequency for consistency. Should be incremented everytime there's an update to the CRSP database)*/
 %end;

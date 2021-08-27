@@ -224,7 +224,7 @@ nyse_size_cutoffs[, eom := as.Date(eom, format = "%Y%m%d")]
 # CRSP Return Cutoffs
 crsp_ret_cutoffs <- fread(paste0(data_path, "/crsp_return_cutoffs.csv"), colClasses = c("eom"="character"))
 crsp_ret_cutoffs[, eom := as.Date(eom, format = "%Y%m%d")]
-crsp_ret_cutoffs[, eom_lag1 := floor_date(eom, unit = "month") - 1]  # Because I use ret_exc_lead1m
+crsp_ret_cutoffs[, eom_lag1 := floor_date(eom, unit = "month") - 1]  # Because we use ret_exc_lead1m
 
 # Market 
 market <- fread(paste0(data_path, "/market_returns.csv"), colClasses = c("eom"="character"))

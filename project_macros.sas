@@ -375,14 +375,24 @@ Importantly, a given company (gvkey) can potentially have up to 3 primary securi
 	run;
 	
 	/* Incorporate Delisting Returns */
-	proc sql;
-		create table __crsp_sf3 as
-		select a.*, b.dlret, b.dlstcd
-		from __crsp_sf2 as a left join crsp.&freq.sedelist as b
-		on a.permno=b.permno and year(a.date)=year(b.dlstdt) and month(a.date)=month(b.dlstdt);
-	quit;
+	%if &freq.=d %then %do;
+		proc sql;
+			create table __crsp_sf3 as
+			select a.*, b.dlret, b.dlstcd
+			from __crsp_sf2 as a left join crsp.&freq.sedelist as b
+			on a.permno=b.permno and a.date=b.dlstdt;
+		quit;
+	%end;
+	%if &freq.=m %then %do;
+		proc sql;
+			create table __crsp_sf3 as
+			select a.*, b.dlret, b.dlstcd
+			from __crsp_sf2 as a left join crsp.&freq.sedelist as b
+			on a.permno=b.permno and year(a.date)=year(b.dlstdt) and month(a.date)=month(b.dlstdt);
+		quit;
+	%end;
 	
-	data __crsp_sf3; 
+	data __crsp_sf4; 
 		set __crsp_sf3; 
 		if missing(dlret) and (dlstcd=500 or (520<=dlstcd<=584)) then dlret=-0.3; /*If delisting is missing and is for performance related reasons. Set to -30%. This is relevant to 155 observations only*/
 		if missing(ret) and not missing(dlret) then ret=0;
@@ -395,9 +405,9 @@ Importantly, a given company (gvkey) can potentially have up to 3 primary securi
 	%if &freq.=m %then %let scale=1;
 	
 	proc sql;
-		create table __crsp_sf4 as 
+		create table __crsp_sf5 as 
 		select a.*, a.ret-coalesce(b.t30ret, c.rf)/&scale. as ret_exc /* I prefer crsp.mcti but FF has monthly updates */
-		from __crsp_sf3 as a 
+		from __crsp_sf4 as a 
 		left join crsp.mcti as b 
 			on year(a.date)=year(b.caldt) and month(a.date)=month(b.caldt)
 		left join ff.factors_monthly as c 
@@ -406,40 +416,40 @@ Importantly, a given company (gvkey) can potentially have up to 3 primary securi
 	
 	* Company Market Equity;
 	proc sql;
-		create table __crsp_sf5 as 
+		create table __crsp_sf6 as 
 		select *, sum(me) as me_company
-		from __crsp_sf4
+		from __crsp_sf5
 		group by permco, date;
 	quit;
 	
 	* Create Primary Sec for Stocks with misisng GVKEY (primarily neccesary prior to 1950);
 	proc sql;
-		create table __crsp_sf6 as
+		create table __crsp_sf7 as
 		select *, max(dolvol) as max_dolvol
-		from __crsp_sf5
+		from __crsp_sf6
 		group by permco, date;
 		
-		update __crsp_sf6		/*For CRSP data ending in 2019. 618.458 out of 630.910 with missing(gvkey) or missing(iid) are updated from 0 to 1 */
+		update __crsp_sf7		/*For CRSP data ending in 2019. 618.458 out of 630.910 with missing(gvkey) or missing(iid) are updated from 0 to 1 */
 		set primary_sec=1
 		where (missing(gvkey) or missing(iid)) and dolvol=max_dolvol;  /* If no GVKEY is available, choose security with the highest dollar volume as the primary security in that month */
 		
-		alter table __crsp_sf6
+		alter table __crsp_sf7
 		drop max_dolvol;
 	quit;
 	
 	* Make volume comparable across daily and monthly set:  https://wrds-web.wharton.upenn.edu/wrds/query_forms/variable_documentation.cfm?vendorCode=CRSP&libraryCode=crspa&fileCode=dsf&id=vol;
 	%if &freq.=m %then %do;
 		proc sql;
-			update __crsp_sf6
+			update __crsp_sf7
 			set vol = vol*100,
 			    dolvol = dolvol*100;
 		quit;
 	%end;
 	
-	proc sort nodupkey data=__crsp_sf6; by permno date; run; /*In monthly file: Two duplicates 15075-20180131 and 86812-20190731 In daily file 13 obs*/
-	data crsp_&freq.sf; set __crsp_sf6;
+	proc sort nodupkey data=__crsp_sf7; by permno date; run; /*In monthly file: Two duplicates 15075-20180131 and 86812-20190731 In daily file 13 obs*/
+	data crsp_&freq.sf; set __crsp_sf7;
 	
-	*proc delete data= __crsp_sf1 __crsp_sf2 __crsp_sf3 __crsp_sf4 __crsp_sf5; 
+	proc delete data= __crsp_sf1 __crsp_sf2 __crsp_sf3 __crsp_sf4 __crsp_sf5 __crsp_sf6 __crsp_sf7; 
 %mend prepare_crsp_sf;
 
 **********************************************************************************************************************
