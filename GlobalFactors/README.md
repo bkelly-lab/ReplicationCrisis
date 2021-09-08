@@ -31,7 +31,7 @@ The file `portfolio.R` generates country level factor returns based on the datas
 	6. The variable `settings` controls the end date, number of portfolio, which breakpoints to use, the data source, whether to winsorize Compustat returns, the minimum amount of stocks for             breakpoints to be valid and whether to create rank weighted (characteristic managed)                  portfolios in each of the 5 size groups. Default settings are the same as used in Jensen,             Kelly and Pedersen (2021).
  6. Run `portfolio.R`.
 
-#### Output
+### Output
 **Files**
 - `pfs.csv`: We sort stocks into 3 portfolios based on non-microcap breakpoints. Portfolio 1 (3) has the stocks with the lowest (highest) value of the characteristic.
 - `hml.csv`: Long/short portfolios that are long stocks with high values of the underlying characteristics (portfolio 3 from pfs.csv) and short stocks with low values (portfolio 1 from pfs.csv). 
