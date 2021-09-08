@@ -16,9 +16,9 @@ library(data.table)
 
 # User Input -----------------------
 # Paths
-data_path <- "C:/Users/tij.fi/Dropbox (CBS)/International Stock Data/Public/Data"
-output_path <- "C:/Users/tij.fi/Dropbox (CBS)/International Stock Data/Public/PaperFactors"
-legacy_path <- "C:/Users/tij.fi/Dropbox (CBS)/International Stock Data/Pre-Public/Data"
+data_path <- "../Public/Data"
+output_path <- "../Public/PaperFactors"
+legacy_path <- "../Pre-Public/Data"
 # Countries
 countries <- list.files(path = paste0(data_path, "/Characteristics")) %>% str_remove(".csv")
 # Chars 
