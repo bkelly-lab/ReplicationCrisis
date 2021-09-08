@@ -37,6 +37,7 @@ The file `portfolio.R` generates country level factor returns based on the datas
 - `hml.csv`: Long/short portfolios that are long stocks with high values of the underlying characteristics (portfolio 3 from pfs.csv) and short stocks with low values (portfolio 1 from pfs.csv). 
 - `lms.csv`: Long/short portfolios based on hml.csv but with the signing convention used in Jensen, Kelly and Pedersen (2021). In particular, we sign factors so they are consistent with the literature. For example, we go long low asset growth stocks and short high asset growth stocks, becuase the literature generally finds that low asset growth stocks outperform. 
 - `cmp.csv`: Rank-weighted (chracteristic managed) portfolios within mega, large, small, micro and nano cap stocks in the US.
+- `market_returns.csv`: Monthly market returns in all the countries we cover.
 - `Country Factors`: Folder with lms.csv in country-by-country files for easier usability. Countries are saved by their [ISO Alpha-3 codes](https://www.nationsonline.org/oneworld/country_code_list.htm).  
 - `Regional Factors`: Folder with regional factors based on lms.csv and the method in Jensen, Kelly and Pedersen (2021).   
 
@@ -58,3 +59,13 @@ The file `portfolio.R` generates country level factor returns based on the datas
 - `ret_vw`: Return with value weights.
 - `ret_vw_cap`: Return with capped value weights as used in Jensen, Kelly and Pedersen (2021).
 - `ret_weighted`: Rank weighted returns.
+- `me_lag1`: Total market equity within a country at the begining of the month
+- `dolvol_lag1`: Total dollar volume traded within a country in the previous month.
+- `stocks`: Stocks included in the market portfolio.
+- `mkt_vw_lcl`: Value weighted market return in local currency.
+- `mkt_ew_lcl`: Equally weighted market return in local currency.
+- `mkt_vw`: Value weighted market return in USD.
+- `mkt_ew`: Equally weighted market return in USD.
+- `mkt_ew_exc`: Equally weighted market excess return in USD.
+- `mkt_vw_exc` (market_return.csv): Value weighted market excess return in USD.
+- `mkt_vw_exc` (Regional Factors): Market cap weighted sum of the market excess return in USD for included in a regional portfolio at a specific point in time.
