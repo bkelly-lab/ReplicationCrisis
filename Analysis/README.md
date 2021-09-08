@@ -3,10 +3,10 @@ This repository contains code that is used for the paper [Is There a Replication
 
 ## How To Run the Code
 
-1. Start with factor returns in each country using one of the following methods.
+1. Start with factor returns in each country. The files you need to download are `hml.csv`, `cmp.csv` and `market_returns.csv` using one of the following methods.
 	1. Download the factor returns used in the paper [here](https://www.dropbox.com/sh/wcrjok1qyxtrasi/AABZ90GDCUvIzDzijt8Qoo3ha?dl=0). 
-	1. Download the latest version of the factor returns at [https://www.bryankellyacademic.org/](https://www.bryankellyacademic.org/) under "Factor Portfolio Returns". 
-	1. Generate the factor returns from scratch by following the steps in [https://github.com/bkelly-lab/GlobalFactor/blob/master/README.md](https://github.com/bkelly-lab/GlobalFactor/blob/master/README.md) as the output from `portfolios.R`. 
+	1. Download the latest version of the factor returns [here](https://www.dropbox.com/sh/ep40dynf2w3lck4/AACYXMDxbGOv21lVK7OC4fq7a?dl=0). 
+	1. Generate the factor returns from scratch by following the steps in https://github.com/bkelly-lab/ReplicationCrisis/tree/master/GlobalFactors](https://github.com/bkelly-lab/ReplicationCrisis/tree/master/GlobalFactors) as the output from `portfolios.R`. 
 2. Copy the code from this repository to a local folder. 
 3. Open `main.R` in the programming language "R".
 4. Ensure that the current working directory is the folder from 2. To check this, write `getwd()` in the console. To change the working directory use `setwd()`.
