@@ -80,6 +80,14 @@ settings <- list(
     int = F,
     standardize = T,
     weight = "vw_cap"
+  ),
+  regional_pfs = list(
+    ret_type = "vw_cap",                    # Type of return to use for regional factors
+    country_excl = c("ZWE", "VEN"),         # Countries are excluded due to data issues
+    country_weights = "market_cap",         # How to weight countries? In ("market_cap", "stocks", "ew")
+    stocks_min = 5,                         # Minimum amount of stocks in each side of the portfolios
+    months_min = 5 * 12,                    # Minimum amount of observations a factor needs to be included  
+    countries_min = 3                       # Minimum number of countries necessary in a regional portfolio
   )
 )
 
@@ -217,6 +225,31 @@ portfolios <- function(
 }
 
 # Extract Neccesary Information --------------------
+# Factor Details
+char_info <- readxl::read_xlsx("Factor Details.xlsx", sheet = "details", range = "A1:N300") %>%
+  select("characteristic"=abr_jkp, direction) %>%
+  filter(!is.na(characteristic)) %>%
+  mutate(direction = direction %>% as.integer) %>%
+  setDT()
+
+# Country Classification
+country_classification <- readxl::read_xlsx("Country Classification.xlsx", 
+                                            sheet = "countries", range = "A1:I200") %>%
+  select(excntry, msci_development, region) %>%
+  filter(!is.na(excntry) & !(excntry %in% settings$regional_pfs$country_excl)) %>%
+  setDT()
+regions <- tibble(
+  name = c("developed", "emerging", "frontier", "world", "world_ex_us"),
+  country_codes = list(
+    country_classification[msci_development == "developed" & excntry != "USA"]$excntry,
+    country_classification[msci_development == "emerging"]$excntry,
+    country_classification[msci_development == "frontier"]$excntry,
+    country_classification$excntry,
+    country_classification[excntry != "USA"]$excntry
+  ),
+  countries_min = c(rep(settings$regional_pfs$countries_min, 3), 1, 3)
+)
+
 # NYSE Cutoff 
 nyse_size_cutoffs <- fread(paste0(data_path, "/nyse_cutoffs.csv"), colClasses = c("eom"="character"))
 nyse_size_cutoffs[, eom := as.Date(eom, format = "%Y%m%d")]
@@ -253,6 +286,8 @@ portfolio_data <- countries %>% lapply(function(ex) {
 
 # Extract Portfolio Returns
 pf_returns <- portfolio_data %>% lapply(function(x) x$pf_returns) %>% rbindlist() 
+pf_returns <- pf_returns %>% select(excntry, characteristic, pf, eom, n, signal, ret_ew, ret_vw, ret_vw_cap)
+pf_returns %>% setorder(excntry, characteristic, pf, eom)
 
 # Create HML Returns
 hml_returns <- pf_returns[, .(
@@ -267,10 +302,50 @@ hml_returns <- pf_returns[, .(
 hml_returns <- hml_returns[pfs == 2][, pfs := NULL]
 hml_returns %>% setorder(excntry, characteristic, eom)
 
+# Create Long-Short Factors [Sign Returns to be consistent with original paper]
+lms_returns <- char_info[hml_returns, on = "characteristic"]
+resign_cols <- c("signal", "ret_ew", "ret_vw", "ret_vw_cap")
+lms_returns[, (resign_cols) := lapply(.SD, function(x) x*direction), .SDcols=resign_cols]
+
 # Extract Signals (TBD)
 
 # Extract CMP returns
 cmp_returns <- portfolio_data %>% lapply(function(x) x$cmp) %>% rbindlist() 
+cmp_returns <- cmp_returns %>% select(excntry, characteristic, size_grp, eom, n_stocks, signal_weighted, ret_weighted)
+
+# Regional Portfolios ------------------------------------------------
+regional_data <- function(data, countries, weighting, countries_min, months_min, stocks_min) {
+  # Determine Country Weights
+  weights <- market[, .(excntry, eom, mkt_vw_exc, "country_weight" = case_when(
+    weighting == "market_cap" ~ me_lag1,
+    weighting == "stocks" ~ as.double(stocks),
+    weighting == "ew" ~ 1)
+  )]
+  # Portfolio Return 
+  pf <- data[excntry %in% countries & n_stocks_min >= stocks_min] 
+  pf <- weights[pf, on = .(excntry, eom)]
+  pf <- pf[, .(
+    n_countries = .N,
+    ret_ew = sum(ret_ew*country_weight) / sum(country_weight),
+    ret_vw = sum(ret_vw*country_weight) / sum(country_weight),
+    ret_vw_cap = sum(ret_vw_cap*country_weight) / sum(country_weight),
+    mkt_vw_exc = sum(mkt_vw_exc * country_weight) / sum(country_weight) 
+  ), by = .(characteristic, eom)]
+  # Minimum Requirement: Countries
+  pf <- pf[n_countries >= countries_min]
+  # Minimum Requirement: Months
+  pf[, months := .N, by = .(characteristic)]
+  pf <- pf[months >= months_min][, months := NULL]
+  return(pf)
+}
+regional_pfs <- 1:nrow(regions) %>% lapply(function(i) {
+  info <- regions[i, ]
+  reg_pf <- lms_returns %>% regional_data(countries = unlist(info$country_codes), weighting = settings$regional_pfs$country_weights,
+                                          countries_min = info$countries_min, months_min = settings$regional_pfs$months_min, 
+                                          stocks_min = settings$regional_pfs$stocks_min)
+  reg_pf %>% mutate(region = info$name)
+}) %>% bind_rows() 
+regional_pfs <- regional_pfs %>% select(region, characteristic, eom, n_countries, ret_ew, ret_vw, ret_vw_cap, mkt_vw_exc)
 
 # Save ----------------
 if(!is.null(legacy_path)) {
@@ -281,11 +356,28 @@ if(!is.null(legacy_path)) {
   market[eom <= settings$end_date] %>% fwrite(file = paste0(folder, "/market_returns.csv"))
   pf_returns[eom <= settings$end_date] %>% fwrite(file = paste0(folder, "/pfs.csv"))
   hml_returns[eom <= settings$end_date] %>% fwrite(file = paste0(folder, "/hml.csv"))
+  lms_returns[eom <= settings$end_date] %>% fwrite(file = paste0(folder, "/lms.csv"))
   cmp_returns[eom <= settings$end_date] %>% fwrite(file = paste0(folder, "/cmp.csv"))
 }
 # Save Most Recent Files
-settings %>% saveRDS(file = paste0(output_path, "/settings.RDS"))
 market[eom <= settings$end_date] %>% fwrite(file = paste0(output_path, "/market_returns.csv"))
 pf_returns[eom <= settings$end_date] %>% fwrite(file = paste0(output_path, "/pfs.csv"))
 hml_returns[eom <= settings$end_date] %>% fwrite(file = paste0(output_path, "/hml.csv"))
+lms_returns[eom <= settings$end_date] %>% fwrite(file = paste0(output_path, "/lms.csv"))
 cmp_returns[eom <= settings$end_date] %>% fwrite(file = paste0(output_path, "/cmp.csv"))
+# Save Regional Factors
+reg_folder <- paste0(output_path, "/Regional Factors")
+if (!dir.exists(reg_folder)) {
+  dir.create(reg_folder)
+}
+for (reg in unique(regional_pfs$region)) {
+  regional_pfs[eom <= settings$end_date & region %in% reg] %>% fwrite(file = paste0(reg_folder, "/", str_to_sentence(reg), ".csv"))
+}
+# Save Long/Short Factors by Country
+cnt_folder <- paste0(output_path, "/Country Factors")
+if (!dir.exists(cnt_folder)) {
+  dir.create(cnt_folder)
+}
+for (exc in unique(lms_returns$excntry)) {
+  lms_returns[eom <= settings$end_date & excntry==exc] %>% fwrite(file = paste0(cnt_folder, "/", exc, ".csv"))
+}
