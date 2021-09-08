@@ -1,5 +1,5 @@
 ## Overview
-This repository contains code that create a dataset of global stock returns and characteristics. The dataset was created for the paper [Is There a Replication Crisis in Finance?](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=3774514) by Jensen, Kelly and Pedersen (2021). Please cite this paper if you are using the code or data.
+This repository contains code that create a dataset of global stock returns and characteristics. The dataset was created for the paper [Is There a Replication Crisis in Finance?](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=3774514) by Jensen, Kelly and Pedersen (2021). Please cite this paper if you are using the code or data. Follow this [link](https://www.dropbox.com/sh/61j1v0sieq9z210/AACdJ68fs5_eT_eJMunwMBWia?dl=0) for a detailed documentation of the data sets.
 
 ## How to Generate Global Stock Returns and Stock Characteristics
 The .sas files construct the stock-level characteristics and factor portfolio returns for all countries. The code requires a connection to WRDS servers. Below we outline our preferred approach to creating the dataset:
@@ -30,5 +30,31 @@ The file `portfolio.R` generates country level factor returns based on the datas
 	5. The variable `chars` controls which characteristics to use for creating factor returns. By default, it is set to the 153 characteristics from Jensen, Kelly and Pedersen (2021). Any             column in the charactersitic dataset can be used to as the basis of a factor. 
 	6. The variable `settings` controls the end date, number of portfolio, which breakpoints to use, the data source, whether to winsorize Compustat returns, the minimum amount of stocks for             breakpoints to be valid and whether to create rank weighted (characteristic managed)                  portfolios in each of the 5 size groups. Default settings are the same as used in Jensen,             Kelly and Pedersen (2021).
  6. Run `portfolio.R`.
-  
-The code will generate 5 files, _hml.csv_ contains the high minus low portfolios. Note that the portfolios has not been signed to produce a positive return. For example the high minus low asset growth portfolio (_at_gr1_) goes long stocks with a high asset growth and short stocks with low asset growth even though stocks with low asset growth have historically outperformed. Table J.1 in Jensen, Kelly and Pedersen (2021) shows how we signed the factor for the paper. _pfs.csv_ includes the individual portfolios that are the basis of the high minus low portfolios. _cmp.csv_ includes the characteristic managed portfolios. _market_returns.csv_ includes monthly market returns. _settings.RDS_ copies the `settings` variable for easy reference.
+
+#### Output
+**Files**
+- `pfs.csv`: We sort stocks into 3 portfolios based on non-microcap breakpoints. Portfolio 1 (3) has the stocks with the lowest (highest) value of the characteristic.
+- `hml.csv`: Long/short portfolios that are long stocks with high values of the underlying characteristics (portfolio 3 from pfs.csv) and short stocks with low values (portfolio 1 from pfs.csv). 
+- `lms.csv`: Long/short portfolios based on hml.csv but with the signing convention used in Jensen, Kelly and Pedersen (2021). In particular, we sign factors so they are consistent with the literature. For example, we go long low asset growth stocks and short high asset growth stocks, becuase the literature generally finds that low asset growth stocks outperform. 
+- `cmp.csv`: Rank-weighted (chracteristic managed) portfolios within mega, large, small, micro and nano cap stocks in the US.
+- `Country Factors`: Folder with lms.csv in country-by-country files for easier usability. Countries are saved by their [ISO Alpha-3 codes](https://www.nationsonline.org/oneworld/country_code_list.htm).  
+- `Regional Factors`: Folder with regional factors based on lms.csv and the method in Jensen, Kelly and Pedersen (2021).   
+
+**Variables**
+- `excntry`: Country where securities are listed as ISO Alpha-3 codes.
+- `eom`: End-of-month of the month used to calculate returns.
+- `characteristic`: Name of characteristic, refer to table J.1 in Jensen, Kelly and Pedersen (2021).
+- `region`: Region/MSCI country development of included factors. 
+- `size_grp`: Size group used to create the rank weighted factors.
+- `pf`: Portfolio identifier
+- `n`: Total number of stocks in the portfolio.
+- `n_stocks`: Total number of stocks in the long and short portfolio.
+- `n_stocks_min`: Minimum number of stocks in the long and short portfolio. For example, if the long portfolio has 10 stocks and the short portfolio has 40 stocks, n_stocks=50 and n_stocks_min=10.
+- `n_countries`: Number of countries included in regional portfolio.
+- `signal` (pfs.csv): Median characteristic value in the portfolio.
+- `signal` (hml.csv, lms.csv): Difference between the median characteristics in the long and short portfolio.
+- `signal_weighted`: Rank weighted signal.
+- `ret_ew`: Return with equal weights.
+- `ret_vw`: Return with value weights.
+- `ret_vw_cap`: Return with capped value weights as used in Jensen, Kelly and Pedersen (2021).
+- `ret_weighted`: Rank weighted returns.
