@@ -16,9 +16,9 @@ library(data.table)
 
 # User Input -----------------------
 # Paths
-data_path <- "../Public/Data"
-output_path <- "../Public/PaperFactors"
-legacy_path <- "../Pre-Public/Data"
+data_path <- "../../Data"
+output_path <- "../../PaperFactors"
+legacy_path <- "../../../Pre-Public/Data"
 # Countries
 countries <- list.files(path = paste0(data_path, "/Characteristics")) %>% str_remove(".csv")
 # Chars 

@@ -1,7 +1,7 @@
-.Rproj.user
-.Rhistory
-.RData
-.Ruserdata
+GlobalFactors/.Rproj.user
+GlobalFactors/.Rhistory
+GlobalFactors/.RData
+GlobalFactors/.Ruserdata
 Analysis/Factors/
 Analysis/Objects/
 Analysis/Figures/
@@ -9,3 +9,4 @@ Analysis/.Rproj.user
 Analysis/.Rhistory
 Analysis/.RData
 Analysis/.Ruserdata
+.Rproj.user
