@@ -1,7 +1,7 @@
 ## Overview
 This repository contains code that create a dataset of global stock returns and characteristics. The dataset was created for the paper [Is There a Replication Crisis in Finance?](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=3774514) by Jensen, Kelly and Pedersen (2021). Please cite this paper if you are using the code or data.
 
-## How to Generate Dataset
+## How to Generate Global Stock Returns and Stock Characteristics
 The .sas files construct the stock-level characteristics and factor portfolio returns for all countries. The code requires a connection to WRDS servers. Below we outline our preferred approach to creating the dataset:
 
 1. Connect to the [SAS studio server hosted by WRDS](https://wrds-cloud.wharton.upenn.edu/SASStudio/index?locale=en_US).  
