@@ -99,7 +99,7 @@
 	/* Set non-standard returns to missing */
 	data __monthly_chars4; 
 		set __monthly_chars3;
-		ret_miss = missing(ret_x) or ret_zero=1 or ret_lag_dif^=1; /* Important Screen, see [1]*/
+		ret_miss = missing(ret_x) or ret_lag_dif^=1; /* We set returns with more than one month between price observations to missing (only impact Compustat data) */
 		if ret_miss = 1 then do;
 			ret_x = .;
 			ret=.;
@@ -112,6 +112,7 @@
 	
 	/* Create variables */
 	proc sort nodup data=__monthly_chars4; by id eom; run;
+	%macro temp();
 	data __monthly_chars5;
 		set __monthly_chars4; 
 		by id eom;
@@ -166,7 +167,7 @@
 			%let from = %scan(&from_lags., &j.);
 			%let to = %scan(&to_lags., &j.);
 			ret_&from._&to. = lag&to.(ri_x)/lag&from.(ri_x)-1;
-			if count <= &from. or missing(lag&from.(ret_x)) or missing(lag&to.(ret_x)) then /* For explanation of missing requirements, see [2] */
+			if count <= &from. or missing(lag&to.(ret_x)) then /* Require the last return observation to be non-missing */
 				ret_&from._&to.=.; 
 		%end;
 		
@@ -180,9 +181,13 @@
 		/* Drop Uneccesary Variables */
 		drop me shares adjfct shares adjfct prc ret ret_local ret_x
 			div_tot div_cash div_spc dolvol ret_exc mkt_vw_exc ret_miss ri_x ri count;
-	run;	
+	run;
+	%mend;
+	%temp();
 	
 	proc sort data=__monthly_chars5 out=&out.; by id eom; run;
+	
+	proc delete data=__stock_coverage __full_range __monthly_chars1 __monthly_chars2 __monthly_chars3 __monthly_chars4 __monthly_chars5; run;
 %mend;
 
 /* Calculate CAPM beta over a rolling window */
@@ -397,10 +402,7 @@
 		alter table dsf1
 		drop ret_lag_dif, bidask;
 	quit;
-	
-	%winsorize_own(inset=dsf1, outset=dsf2, sortvar=eom, vars=ret_exc ret, perc_low=0.1, perc_high=99.9); /* Winsorize returns at 0.1% and 99.9% */
-	%winsorize_own(inset=dsf2, outset=dsf3, sortvar=eom, vars=tvol dolvol_d, perc_low=0, perc_high=99.9); /* Winsorize volume at at 99.9% */
-	proc sort data=dsf3; by id date; run;
+	proc sort data=dsf1; by id date; run;
 	
 	* Create lead/lagged market returns (For dimson beta);
 	proc sql;
@@ -426,7 +428,7 @@
 	
 	* Overlapping returns used to calculate correlation;
 	data corr_data;
-		set dsf3;
+		set dsf1;
 		ret_exc_3l = ret_exc + lag(ret_exc) + lag2(ret_exc);
 		mkt_exc_3l = mktrf + lag(mktrf) + lag2(mktrf);
 		if id ^= lag2(id) then do;
@@ -440,7 +442,7 @@
 	proc sql;
 		create table month_ends as 
 		select distinct eom
-		from dsf3
+		from dsf1
 		order by eom;
 	quit;
 	
@@ -480,7 +482,7 @@
 	%mend;
 	
 	* Drop unneccesary columns for faster join;
-	data __input; set dsf3; run;
+	data __input; set dsf1; run;
 	%if %sysfunc(find(&__stats., ff3)) = 0 %then %do;
 		proc sql;
 			alter table __input
@@ -890,7 +892,7 @@
 	
 	* Initialize dataset to append to;
 	data &out.;
-		format id $char20. eom YYMMDDN8. stat $char20. value 16.8;
+		format id 9.0 eom YYMMDDN8. stat $char20. value 16.8;
 		stop;  
 	run;
 	%do k=1 %to %nwords(&op_datasets.);

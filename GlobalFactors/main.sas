@@ -7,6 +7,12 @@ proc delete data = _all_ ; run ;
 * Assign scratch and project folder names;
 %let scratch_folder = /scratch/cbs/tij; 
 %let project_folder = ~/Global Data;
+* Set defaults;
+%let delete_temp = 1;  * Should temporary files be deleted?;
+%let save_csv = 1;     * Should the main data set be save country-by-country in a .csv format?;
+%let save_daily_ret = 1;   * Save daily stocks returns country-by-country in a .csv format?;
+%let save_monthly_ret = 1;   * Save monthly stocks returns  in a .csv format;
+%let end_date = '31DEC2020'd; * Date of last observation: CRSP data is only updated annually, so we keep this updating frequency for consistency. Should be incremented every time there's an update to the CRSP database);
 
 ***************************************************************************
 * Libraries and Functions
@@ -22,6 +28,7 @@ libname project "&project_folder.";
 %include "&project_folder./accounting_chars.sas";
 %include "&project_folder./ind_identification.sas";
 
+
 *****************************************************************************
 * Create Return Data
 **************************************************************************** ; 
@@ -31,25 +38,25 @@ libname project "&project_folder.";
 %prepare_crsp_sf(freq=m);
 %combine_crsp_comp_sf(out_msf=world_msf1, out_dsf=scratch.world_dsf, crsp_msf=crsp_msf, comp_msf=comp_msf, crsp_dsf=crsp_dsf, comp_dsf=comp_dsf);
 
+proc delete data=comp_dsf crsp_dsf comp_msf crsp_msf; run;
 *****************************************************************************
 * Add Industry Codes 
 ***************************************************************************** ;
 %crsp_industry(out=crsp_ind);
 %comp_industry(out=comp_ind);
-
 proc sql;
 	create table world_msf2 as
-	select a.*, b.gics as gics, coalesce(b.sic, c.sic) as sic, coalesce(b.naics, c.naics) as naics /* Prefer COMPUSTAT to CRSP */
+	select a.*, b.gics as gics, coalesce(b.sic, c.sic) as sic, coalesce(b.naics, c.naics) as naics 
 	from world_msf1 as a
 	left join comp_ind as b on a.gvkey=b.gvkey and a.eom=b.date
 	left join crsp_ind as c on a.permco=c.permco and a.permno=c.permno and a.eom=c.date;
 quit;
+proc delete data=world_msf1 crsp_ind comp_ind; run; * Prefer COMPUSTAT to CRSP;
 
 * Add a column 'ff49' with Fama-French industry classification;
 %ff_ind_class(data=world_msf2, ff_grps=49, out=world_msf3); 
 
-* Extract Information;
-%crsp_return_cutoffs(data=world_msf3, out=scratch.crsp_return_cutoffs);
+* Size cutoffs;
 %nyse_size_cutoffs(data=world_msf3, out=scratch.nyse_cutoffs);
 
 * Classify stocks into size groups;
@@ -66,12 +73,17 @@ proc sql;
 	from world_msf3 as a left join scratch.nyse_cutoffs as b
 	on a.eom=b.eom;
 quit;
+proc delete data=world_msf2 world_msf3; run;
+
+* Return cutoffs;
+%return_cutoffs(data=scratch.world_msf, freq=m, out=scratch.return_cutoffs, crsp_only=0);
+%return_cutoffs(data=scratch.world_dsf, freq=d, out=scratch.return_cutoffs_daily, crsp_only=0); 
 
 *****************************************************************************
 * Market Returns
 **************************************************************************** ; 
-%market_returns(out = scratch.market_returns, data = scratch.world_msf, freq=m, wins = crsp, wins_crsp_data=scratch.crsp_return_cutoffs);
-%market_returns(out = scratch.market_returns_daily, data = scratch.world_dsf, freq=d, wins = all);
+%market_returns(out = scratch.market_returns, data=scratch.world_msf, freq=m, wins_comp=1, wins_data=scratch.return_cutoffs);
+%market_returns(out = scratch.market_returns_daily, data=scratch.world_dsf, freq=d, wins_comp=1, wins_data=scratch.return_cutoffs_daily);
 
 *****************************************************************************
 * Create Characteristics Based on Accounting Data
@@ -84,7 +96,7 @@ quit;
 *****************************************************************************
 * Create Characteristics Based on Monthly Market Data
 **************************************************************************** ;
-%market_chars_monthly(out=scratch.market_chars_m, data = scratch.world_msf, market_ret = scratch.market_returns, local_currency=0); 
+%market_chars_monthly(out=scratch.market_chars_m, data=scratch.world_msf, market_ret = scratch.market_returns, local_currency=0); 
 
 *****************************************************************************
 * Combine Returns, Accounting and Monthly Market Data
@@ -99,7 +111,7 @@ proc sql;
 	on a.gvkey=c.gvkey and a.eom=c.public_date;
 
 	alter table scratch.world_data_prelim 
-	drop div_tot, div_cash, div_spc, public_date;
+	drop div_tot, div_cash, div_spc, public_date, source; 
 quit;
 
 *****************************************************************************
@@ -164,7 +176,7 @@ quit;
 
 * Reorder Variables;
 data world_data5;
-	retain id date eom source size_grp obs_main exch_main primary_sec gvkey iid permno permco excntry curcd fx 
+	retain id date eom source_crsp size_grp obs_main exch_main primary_sec gvkey iid permno permco excntry curcd fx 
 		common comp_tpci crsp_shrcd comp_exchg crsp_exchcd gics sic naics ff49
 		adjfct shares me me_company prc prc_local dolvol ret ret_local ret_exc ret_lag_dif ret_exc_lead1m
 		market_equity enterprise_value book_equity assets sales net_income; 
@@ -173,18 +185,6 @@ run;
 
 * Save combined data;
 proc sort data=world_data5 out=scratch.world_data nodup; by id eom; run;
-
-/* Delete Temporary Files?*/
-%if 1=1 %then %do;
-	proc delete data=
-		scratch.beta_60m scratch.qmj scratch.resmom_ff3_12_1 scratch.resmom_ff3_6_1 scratch.mp_factors
-		scratch.ap_factors_daily scratch.ap_factors_monthly
-		scratch.corwin_schultz scratch.roll_21d scratch.roll_126d scratch.roll_252d scratch.roll_1260d
-		scratch.world_data_prelim scratch.world_dsf scratch.world_msf 
-		scratch.market_chars_m scratch.market_chars_d scratch.acc_chars_world
-		scratch.firm_age; 
-	run;
-%end;
 
 *****************************************************************************
 * Create Output in .csv Format for Download
@@ -209,13 +209,37 @@ proc export data=scratch.nyse_cutoffs
     dbms=CSV
     replace;
 run;
-proc export data=scratch.crsp_return_cutoffs
-    outfile="&scratch_folder./output/crsp_return_cutoffs.csv"   
+proc export data=scratch.return_cutoffs
+    outfile="&scratch_folder./output/return_cutoffs.csv"   
+    dbms=CSV
+    replace;
+run;
+proc export data=scratch.return_cutoffs_daily
+    outfile="&scratch_folder./output/return_cutoffs_daily.csv"   
     dbms=CSV
     replace;
 run;
 
 * Save main data as .csv files by country;
-%if 1=1 %then %do;
-	%save_main_data_csv(out=world, data=scratch.world_data, path=&scratch_folder./output, end_date='31DEC2020'd); /* CRSP data is only updated anually, so we keep this updating frequency for consistency. Should be incremented everytime there's an update to the CRSP database)*/
+%if &save_csv.=1 %then %do;
+	%save_main_data_csv(out=world, data=scratch.world_data, path=&scratch_folder./output, end_date=&end_date.); 
+%end;
+* Save daily return data as .csv files by country;
+%if &save_daily_ret.=1 %then %do;
+	%save_daily_ret_csv(out=world_ret_daily, data=scratch.world_dsf, path=&scratch_folder./output);
+%end;
+* Save monthly return data as .csv files by country;
+%if &save_monthly_ret.=1 %then %do;
+	%save_monthly_ret_csv(out=world_ret_monthly, data=scratch.world_msf, path=&scratch_folder./output);
+%end;
+* Delete Temporary Files;
+%if &delete_temp.=1 %then %do;
+	proc delete data=
+		scratch.beta_60m scratch.qmj scratch.resmom_ff3_12_1 scratch.resmom_ff3_6_1 scratch.mp_factors
+		scratch.ap_factors_daily scratch.ap_factors_monthly
+		scratch.corwin_schultz scratch.roll_21d scratch.roll_126d scratch.roll_252d scratch.roll_1260d
+		scratch.world_data_prelim scratch.world_dsf scratch.world_msf 
+		scratch.market_chars_m scratch.market_chars_d scratch.acc_chars_world
+		scratch.firm_age; 
+	run;
 %end;

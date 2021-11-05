@@ -71,25 +71,51 @@
 
 %mend winsorize_own;
 
-/* MACRO: CRSP RETURN CUTOFFS
-	The output of the macro is the 0.1%, 1%, 99% and 99.9% percentile of excess returns in CRSP.
-	The idea is to use it as a sanity check for Compustat returns
+/* MACRO: RETURN CUTOFFS
+	The output of the macro is the 0.1%, 1%, 99% and 99.9% percentile of excess returns which can later be used for winsorization
+	The reason why this procedure is necesary is that we output the country country-by-country, which makes across country winsorization difficult.
 */
-%macro crsp_return_cutoffs(data=, out=);
-	proc sort data=&data.(where=(source='CRSP')) out=base; by eom; run;
-	proc univariate data=base noprint;
-	  by eom;
-	  var ret_exc;
-	  output out=&out. pctlpts=0.1 1 99 99.9 pctlpre=ret_exc_;
-	run;
+%macro return_cutoffs(data=, freq=, out=, crsp_only=); 
+	%if &freq.=m %then %do;
+		%if &crsp_only.=1 %then %do;
+			proc sort data=&data.(where=(source_crsp=1 and common=1 and obs_main=1 and exch_main=1 and primary_sec=1 and excntry ^= 'ZWE' and not missing(ret_exc))) out=base; by eom; run; 
+		%end;
+		%if &crsp_only.=0 %then %do;
+			proc sort data=&data.(where=(common=1 and obs_main=1 and exch_main=1 and primary_sec=1 and excntry ^= 'ZWE' and not missing(ret_exc))) out=base; by eom; run;
+		%end;
+		proc univariate data=base noprint;
+	  		by eom;
+	  		var ret_exc;
+	  		output out=&out. n=n pctlpts=0.1 1 99 99.9 pctlpre=ret_exc_ ;
+	  	run;
+	  %end;
+	%if &freq.=d %then %do;
+		%if &crsp_only.=1 %then %do;
+			proc sort data=&data.(where=(source_crsp=1 and common=1 and obs_main=1 and exch_main=1 and primary_sec=1 and excntry ^= 'ZWE' and not missing(ret_exc))) out=base; by date; run;
+		%end;
+		%if &crsp_only.=0 %then %do;
+			proc sort data=&data.(where=(common=1 and obs_main=1 and exch_main=1 and primary_sec=1 and excntry ^= 'ZWE' and not missing(ret_exc))) out=base; by date; run;
+		%end;
+		data base; 
+			set base;
+			year=year(date);
+			month=month(date);
+		run;
+		
+		proc univariate data=base noprint;
+	  		by year month;
+	  		var ret_exc;
+	  		output out=&out. n=n pctlpts=0.1 1 99 99.9 pctlpre=ret_exc_;
+	  	run;
+	  %end;
+	  proc delete data=base; run;
 %mend;
 
 /* MACRO: NYSE SIZE CUTOFFS
 	Used for determining size groups and me cap weights
 */
 %macro nyse_size_cutoffs(data=, out=);
-	proc sort data=&data.(where=(
-		crsp_exchcd=1 and obs_main = 1 and exch_main = 1 and primary_sec = 1 and common = 1 and not missing(me))) 
+	proc sort data=&data.(where=(crsp_exchcd=1 and obs_main = 1 and exch_main = 1 and primary_sec = 1 and common = 1 and not missing(me))) 
 		out=nyse_stocks; 
 		by eom; 
 	run;
@@ -99,6 +125,7 @@
 		var me;
 		output out=&out.(drop=_type_ _freq_) N=n P1=nyse_p1 p20 = nyse_p20 P50=nyse_p50 p80 = nyse_p80;
 	run;
+	proc delete data=nyse_stocks; run;
 %mend;
 
 /* Flexible version of WRDS populate function which can also do daily frequency */
@@ -331,7 +358,7 @@ Importantly, a given company (gvkey) can potentially have up to 3 primary securi
 **********************************************************************************************************************
 *                                    US - Data From CRSP
 ********************************************************************************************************************* ; 
-%macro prepare_crsp_sf(freq=m); /* p(eriodicity) in ('d', 'm') for daily and monthly. Returns crsp_msf if p=m and crsp_dsf if p=d*/
+%macro prepare_crsp_sf(freq=m); /* freq in ('d', 'm') for daily and monthly. Returns crsp_msf if p=m and crsp_dsf if p=d*/
 	/* CRSP with Company Information*/
 	proc sql;
 		create table __crsp_sf1 as
@@ -752,10 +779,10 @@ Importantly, a given company (gvkey) can potentially have up to 3 primary securi
 	
 	
 	/* proc freq data=comp_dsf; tables ret_day_dif; run; *Check: 97.2% of non missing ret_day_dif are <=3. 98.8% are <=4; 99.75% are <=10. This might be a reasonable general cutoff for settings returns to 0*/
-	*proc delete data=__firm_shares1 __firm_shares2 fx 
+	proc delete data=__firm_shares1 __firm_shares2 fx 
 		__comp_dsf_na __comp_dsf_global __comp_dsf1 __comp_dsf2 __comp_dsf3 __comp_sf4 __comp_sf5
 		__returns __sec_info __delist1 __delist2 __delist3
-		__comp_sf1 __comp_sf2 __comp_sf3 __comp_sf4 __comp_sf5 __comp_sf6 __excntry &base.; *run;
+		__comp_sf1 __comp_sf2 __comp_sf3 __comp_sf4 __comp_sf5 __comp_sf6 __excntry __exchanges &base.; run;
 %mend prepare_comp_sf;
 
 /* COMBINE CRSP AND COMPUSTAT WITH CRSP PREFERENCE*/
@@ -763,18 +790,21 @@ Importantly, a given company (gvkey) can potentially have up to 3 primary securi
 	/* Monthly Files */
 	proc sql;
 		create table __msf_world1 as
-		select cats('crsp_',permno) as id length=20, permno, permco, gvkey, iid, 'USA' as excntry length=3, exch_main, (shrcd in (10, 11, 12)) as common,  primary_sec,
+		select permno as id, permno, permco, gvkey, iid, 'USA' as excntry length=3, exch_main, (shrcd in (10, 11, 12)) as common,  primary_sec,
 			bidask, shrcd as crsp_shrcd, exchcd as crsp_exchcd, '' as comp_tpci, . as comp_exchg,
 			'USD' as curcd, 1 as fx, date, intnx('month',date,0,'E') as eom format=YYMMDDN8., 
 		   	cfacshr as adjfct, shrout as shares, me, me_company, prc, prc as prc_local, prc_high, prc_low, dolvol, vol as tvol, 
-		   	ret, ret as ret_local, ret_exc, 1 as ret_lag_dif, div_tot, . as div_cash, . as div_spc, 'CRSP' as source length=9 
+		   	ret, ret as ret_local, ret_exc, 1 as ret_lag_dif, div_tot, . as div_cash, . as div_spc, 1 as source_crsp
 		from &crsp_msf.
 		outer union corr
-		select cats('comp_',gvkey,'_',iid) as id length=20, . as permno, . as permco, gvkey, iid, excntry, exch_main, (tpci='0') as common, primary_sec,
+		select case	when prxmatch("/W/", iid) then input(cats('3', gvkey, substr(iid, 1, 2)), 9.0)
+				    when prxmatch("/C/", iid) then input(cats('2', gvkey, substr(iid, 1, 2)), 9.0)
+				    else input(cats('1', gvkey, substr(iid, 1, 2)), 9.0)                            /* IID characters can only take 3 possible valued: http://zeerovery.nl/blogfiles/Comp-IID.pdf*/ 
+			end as id, . as permno, . as permco, gvkey, iid, excntry, exch_main, (tpci='0') as common, primary_sec,
 			(prcstd = 4) as bidask, . as crsp_shrcd, . as crsp_exchcd, tpci as comp_tpci, exchg as comp_exchg, 
 		   	curcdd as curcd, fx, datadate as date, eom, 
 		   	ajexdi as adjfct, cshoc as shares, me, me as me_company, prc, prc_local, prc_high, prc_low, dolvol, cshtrm as tvol,
-		   	ret_local, ret, ret_exc, ret_lag_dif, div_tot, div_cash, div_spc, 'COMPUSTAT' as source  
+		   	ret_local, ret, ret_exc, ret_lag_dif, div_tot, div_cash, div_spc, 0 as source_crsp  
 		from &comp_msf.;
 	quit;	
 	
@@ -790,16 +820,19 @@ Importantly, a given company (gvkey) can potentially have up to 3 primary securi
 	/* Daily Files */
 	proc sql;
 		create table __dsf_world1 as
-		select cats('crsp_',permno) as id length=20, 'USA' as excntry length=3, exch_main, (shrcd in (10, 11, 12)) as common, primary_sec, 
-			bidask, 'USD' as curcd, 1 as fx, date, intnx('month',date,0,'E') as eom format=YYMMDDN8., 
+		select permno as id, 'USA' as excntry length=3, exch_main, (shrcd in (10, 11, 12)) as common, primary_sec, 
+			bidask, 'USD' as curcd, 1 as fx, DATE as date format=YYMMDDN8., intnx('month',DATE,0,'E') as eom format=YYMMDDN8., 
 		   	cfacshr as adjfct, shrout as shares, me, dolvol, vol as tvol, prc, prc_high, prc_low,
-		   	ret as ret_local, ret, ret_exc, 1 as ret_lag_dif 
+		   	ret as ret_local, RET as ret, ret_exc, 1 as ret_lag_dif, 1 as source_crsp /* More memory efficient with integer instead of character vector*/ 
 		from &crsp_dsf.
 		outer union corr
-		select cats('comp_',gvkey,'_',iid) as id length=20, excntry, exch_main, (tpci='0') as common, primary_sec, 
+		select case when prxmatch("/W/", iid) then input(cats('3', gvkey, substr(iid, 1, 2)), 9.0)
+				    when prxmatch("/C/", iid) then input(cats('2', gvkey, substr(iid, 1, 2)), 9.0)
+				    else input(cats('1', gvkey, substr(iid, 1, 2)), 9.0)                            /* IID characters can only take 3 possible valued: http://zeerovery.nl/blogfiles/Comp-IID.pdf*/ 
+			end as id, excntry, exch_main, (tpci='0') as common, primary_sec, 
 			(prcstd = 4) as bidask, curcdd as curcd, fx, datadate as date, intnx('month',datadate,0,'E') as eom format=YYMMDDN8., 
 		   	ajexdi as adjfct, cshoc as shares, me, dolvol, cshtrd as tvol, prc, prc_high, prc_low,
-		   	ret_local, ret, ret_exc, ret_lag_dif  
+		   	ret_local, ret, ret_exc, ret_lag_dif, 0 as source_crsp  
 		from &comp_dsf.;
 	quit;	
 	
@@ -807,7 +840,7 @@ Importantly, a given company (gvkey) can potentially have up to 3 primary securi
 	* If multiple observations for the same GVKEY-IID, Then choose CRSP as the main observation;
 	proc sql;
 		create table __obs_main as 
-		select id, gvkey, iid, eom, (count(gvkey) in (0, 1) or (count(gvkey)=2 and source ='CRSP')) as obs_main
+		select id, gvkey, iid, eom, (count(gvkey) in (0, 1) or (count(gvkey)=2 and source_crsp=1)) as obs_main
 		from __msf_world2
 		group by gvkey, iid, eom;
 		
@@ -825,7 +858,7 @@ Importantly, a given company (gvkey) can potentially have up to 3 primary securi
 	proc sort data=__msf_world3 out=&out_msf. nodupkey; by id eom; run;
 	proc sort data=__dsf_world2 out=&out_dsf. nodupkey; by id date; run;
 	
-	proc delete data= __msf_world1 __msf_world2 __msf_world3 __dsf_world1 __dsf_world2; run; 
+	proc delete data= __msf_world1 __msf_world2 __msf_world3 __dsf_world1 __dsf_world2 __obs_main; run; 
 %mend combine_crsp_comp_sf;
 
 * MACRO: CLEAN_COMP_MSF
@@ -845,23 +878,21 @@ Importantly, a given company (gvkey) can potentially have up to 3 primary securi
 %mend;
 
 * MACRO: MARKET RETURNS
-	For wins, choose crsp or all for 0.1% winsorization based on CRSP or all data
+	If wins_comp=1, need to supply wins_data as well.
 ;
-%macro market_returns(out=, data=, freq=m, wins=, wins_crsp_data=); 
+%macro market_returns(out=, data=, freq=m, wins_comp=1, wins_data=); 
 	%if &freq.=d %then %do;
 		%let dt_col = date;
 		%let max_date_lag = 14;
-		%let source=; /* We don't currently have source in the daily dataset (including a character column would take a huge amount of space given the number of rows in the daily dataset*/
 	%end;
 	%if &freq.=m %then %do;
 		%let dt_col = eom;
 		%let max_date_lag = 1;
-		%let source=source,;
 	%end;
 	/* Create Index Data */
 	proc sql;
 		create table __common_stocks1 as
-		select distinct &source. id, date, eom, excntry, obs_main, exch_main, primary_sec, common, ret_lag_dif, me, dolvol, ret, ret_local, ret_exc
+		select distinct source_crsp, id, date, eom, excntry, obs_main, exch_main, primary_sec, common, ret_lag_dif, me, dolvol, ret, ret_local, ret_exc
 		from &data.
 		order by id, &dt_col.;
 	quit;
@@ -877,32 +908,42 @@ Importantly, a given company (gvkey) can potentially have up to 3 primary securi
 		end;
 	run;
 	
-	%if &wins. = crsp %then %do;
+	%if &wins_comp. = 1 %then %do;
+		%if &freq.=m %then %do;
+			proc sql;
+				create table __common_stocks3 as
+				select a.*, b.ret_exc_0_1, b.ret_exc_99_9
+				from __common_stocks2 as a 
+				left join &wins_data. as b
+				on a.eom=b.eom;
+			quit;
+		%end;
+		%if &freq.=d %then %do;
+			proc sql;
+				create table __common_stocks3 as
+				select a.*, b.ret_exc_0_1, b.ret_exc_99_9
+				from __common_stocks2 as a 
+				left join &wins_data. as b
+				on year(a.date)=b.year and month(a.date)=b.month;
+			quit;
+		%end;
 		proc sql;
-			create table __common_stocks3 as
-			select a.*, b.ret_exc_0_1, b.ret_exc_99_9
-			from __common_stocks2 as a 
-			left join &wins_crsp_data. as b
-			on a.eom=b.eom;
-	
 			update __common_stocks3 
 			set ret_exc = ret_exc_99_9
-			where ret_exc > ret_exc_99_9 and source = 'COMPUSTAT' and not missing(ret_exc);
+			where ret_exc > ret_exc_99_9 and source_crsp = 0 and not missing(ret_exc);
 			
 			update __common_stocks3 
 			set ret_exc = ret_exc_0_1
-			where ret_exc < ret_exc_0_1 and source = 'COMPUSTAT' and not missing(ret_exc);
+			where ret_exc < ret_exc_0_1 and source_crsp = 0 and not missing(ret_exc);
 			
 			alter table __common_stocks3
 			drop ret_exc_0_1, ret_exc_99_9;
 		quit;
 		
 	%end;
-	%if &wins. = all %then %do;
-		%winsorize_own(inset=__common_stocks2, outset=__common_stocks3, sortvar=eom, vars=ret ret_local ret_exc, perc_low=0.1, perc_high=99.9); /* Notice I do winsorization by eom. Alternatively, we could do it by (excntry, date) but this could result in outliers when a country have few stocks */
+	%if &wins_comp. = 0 %then %do;
+		data __common_stocks3; set __common_stocks2; run;
 	%end;
-	
-	
 	proc sql;
 		create table mkt1 as
 		select excntry, &dt_col., 
@@ -975,7 +1016,7 @@ Importantly, a given company (gvkey) can potentially have up to 3 primary securi
 	proc sql;
 		create table base1 as 
 		select id, eom, size_grp, excntry, me, market_equity, be_me, at_gr1, niq_be,
-			source, exch_main, obs_main, common, comp_exchg, crsp_exchcd, primary_sec, ret_lag_dif
+			source_crsp, exch_main, obs_main, common, comp_exchg, crsp_exchcd, primary_sec, ret_lag_dif
 		from &mchars.;
 	quit;
 	
@@ -990,7 +1031,7 @@ Importantly, a given company (gvkey) can potentially have up to 3 primary securi
 		%do i=1 %to %nwords(&cols_lag.); 
 			%let col = %scan(&cols_lag., &i, %str(' '));
 			&col._l = lag(&col.);
-			if id ^= lag(id) or source ^= lag(source) or intck("month", lag(eom), eom)^=1 then
+			if id ^= lag(id) or source_crsp ^= lag(source_crsp) or intck("month", lag(eom), eom)^=1 then
 				&col._l = .;
 			drop &col.;
 		%end;
@@ -1126,6 +1167,12 @@ Importantly, a given company (gvkey) can potentially have up to 3 primary securi
 	quit;
 %mend;
 
+* MACRO: FILE DELETE;
+%macro file_delete(file);
+  %let rc= %sysfunc(filename(fref,&file));
+  %let rc= %sysfunc(fdelete(&fref));
+%mend;
+
 * MACRO: SAVE_MAIN_DATA_CSV
 - The macro saves the main data as separate .csv files by country. 
 - By main data we mean data for common stocks that are the primary security of the underlying firm with non-missing return and lagged market equity 
@@ -1145,7 +1192,7 @@ Importantly, a given company (gvkey) can potentially have up to 3 primary securi
 	
 	* Reorder Variables;
 	data main_data2;
-		retain id date eom source size_grp obs_main exch_main primary_sec gvkey iid permno permco excntry curcd fx 
+		retain id date eom source_crsp size_grp obs_main exch_main primary_sec gvkey iid permno permco excntry curcd fx 
 			common comp_tpci crsp_shrcd comp_exchg crsp_exchcd
 			adjfct shares me me_lag1; 
 		set main_data1;
@@ -1191,10 +1238,6 @@ Importantly, a given company (gvkey) can potentially have up to 3 primary securi
 	ods package(newzip) close;
 	
 	/* Delete intermidiate .csv files */
-	%macro file_delete(file);
-	  %let rc= %sysfunc(filename(fref,&file));
-	  %let rc= %sysfunc(fdelete(&fref));
-	%mend;
 	%do i=1 %to %nwords(&countries.);
 		%let __c = %scan(&countries., &i., %str(' '));
 		%file_delete(file=&path./&__c..csv);
@@ -1202,7 +1245,86 @@ Importantly, a given company (gvkey) can potentially have up to 3 primary securi
 	proc delete data = main_data1 main_data2 main_data3; run;
 %mend;
 
+* MACRO: SAVE_DAILY_RET_CSV
+- The macro saves the daily return data as a separate .csv file country-by-country. 
+  Arguments
+	- out: Name of the output Zip file (will be saved in &path.)
+	- data: should be the path to world_dsf
+	- path: path where data is stored. Should be a scratch directory
+;
+%macro save_daily_ret_csv(out=, data=, path=);
+	data daily; 
+		set &data.;
+		keep excntry id source_crsp date ret_exc; 
+	run;
+	proc sql noprint;
+		select distinct lowcase(excntry) into :countries separated by ' '
+		from daily;
+	quit;
+	/* Create country .csv files */
+	option nonotes;
+	%do i=1 %to %nwords(&countries.);
+		%let __c = %scan(&countries., &i., %str(' '));
+		%put ################ "&path./&__c..csv" ########################;
+		proc export data=daily(where=(excntry = upcase("&__c.")))
+		    outfile="&path./&__c..csv"   
+		    dbms=CSV
+		    replace;
+		run;
+	%end;
+	option notes;
+	
+	* Zip file for easier download;
+	ods package (newzip) open nopf;
+	%do i=1 %to %nwords(&countries.);
+		%let __c = %scan(&countries., &i., %str(' '));
+		ods package (newzip) add file="&path./&__c..csv";
+	%end;
+	ods package (newzip) publish archive 
+		properties (
+			archive_name="&out..zip" 
+			archive_path= "&path."
+		);
+	ods package(newzip) close;
+	
+	/* Delete intermidiate .csv files */
+	%do i=1 %to %nwords(&countries.);
+		%let __c = %scan(&countries., &i., %str(' '));
+		%file_delete(file=&path./&__c..csv);
+	%end;
+	proc delete data = daily; run;
+%mend;
 
+* MACRO: SAVE_MONTHLY_RET_CSV
+- The macro saves the monthly return data as a .csv across all countries. 
+  Arguments
+	- out: Name of the output Zip file (will be saved in &path.)
+	- data: should be the path to world_msf
+	- path: path where data is stored. Should be a scratch directory
+;
+%macro save_monthly_ret_csv(out=, data=, path=);
+	data monthly; 
+		set &data.;
+		keep excntry id source_crsp eom ret_exc ret ret_local; 
+	run;
+	proc export data=monthly
+	    outfile="&path./world_ret_monthly.csv"   
+	    dbms=CSV
+	    replace;
+	run;
+	* Zip file for easier download;
+	ods package (newzip) open nopf;
+	ods package (newzip) add file="&path./world_ret_monthly.csv";
+	ods package (newzip) publish archive 
+		properties (
+			archive_name="&out..zip" 
+			archive_path= "&path."
+		);
+	ods package(newzip) close;
+	* Delete intermidiate .csv files;
+	%file_delete(file=&path./world_ret_monthly.csv);
+	proc delete data = monthly; run;
+%mend;
 
 
 /* Footnotes */*

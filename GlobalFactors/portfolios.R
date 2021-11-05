@@ -4,7 +4,7 @@ library(data.table)
 
 # How To --------------------
 # Paths
-# - data_path:    Set to path with global characteristics data.
+# - data_path:    Set to path with global characteristics data and if daily_pf==T should also contain a folder with daily stock returns.
 # - output_path:  Set to desired output folder.
 # - legacy_path:  Set to folder if you want to maintain legacy version. If not, set to NULL.
 # Countries
@@ -67,7 +67,7 @@ chars <- c(
 settings <- list(
   end_date = as.Date("2020-12-31"),
   pfs = 3,
-  data_source = c("CRSP", "COMPUSTAT"),
+  source = c("CRSP", "COMPUSTAT"),                           
   wins_ret = T,
   bps = "non_mc",
   bp_min_n = 10,
@@ -88,15 +88,17 @@ settings <- list(
     stocks_min = 5,                         # Minimum amount of stocks in each side of the portfolios
     months_min = 5 * 12,                    # Minimum amount of observations a factor needs to be included  
     countries_min = 3                       # Minimum number of countries necessary in a regional portfolio
-  )
+  ), 
+  daily_pf = T,
+  ind_pf = T
 )
 
 # Portfolio Function -------------
 portfolios <- function(
   data_path,
   excntry,
-  chars,
-  data_source = c("CRSP", "COMPUSTAT"),  # Use data from "CRSP", "COMPUSTAT", or both c("CRSP", "COMPUSTAT")
+  chars, 
+  source = c("CRSP", "COMPUSTAT"),       # Use data from "CRSP", "Compustat" or both: c("CRSP", "COMPUSTAT")
   wins_ret = T,                          # Should Compustat returns be winsorized at the 0.1% and 99.9% of CRSP returns? 
   pfs,                                   # Number of portfolios 
   bps,                                   # What should breakpoints be based on? Non-Microcap stocks ("non_mc") or NYSE stocks "nyse"
@@ -106,29 +108,84 @@ portfolios <- function(
   signals_standardize = F,               # Map chars to [-0.5, +0.5]?,
   signals_w = "vw_cap",                  # Weighting for signals: in c("ew", "vw", "vw_cap")
   nyse_size_cutoffs,                     # Data frame with NYSE size breakpoints
-  crsp_ret_cutoffs = NULL                # Data frame with CRSP return information. Neccesary when wins_ret=T
+  daily_pf= F,                           # Should daily return be estimated
+  ind_pf = F,                            # Should industry portfolio returns be estimated
+  ret_cutoffs = NULL,                    # Data frame for monthly winsorization. Neccesary when wins_ret=T
+  ret_cutoffs_daily = NULL               # Data frame for daily winsorization. Neccesary when wins_ret=T and daily_pf=T
 ) {
   # Characteristic Data
-  data <- fread(paste0(data_path, "/Characteristics/", excntry, ".csv"), select = c("excntry", "id", "eom", "source", "comp_exchg", "crsp_exchcd", "size_grp", "ret_exc", "ret_exc_lead1m", "me", chars), colClasses = c("eom"="character"))
-  data[, eom := as.Date(lubridate::fast_strptime(eom, format = "%Y%m%d"))]
+  data <- fread(paste0(data_path, "/Characteristics/", excntry, ".csv"), select = c("excntry", "id", "eom", "source_crsp", "comp_exchg", "crsp_exchcd", "size_grp", "ret_exc", "ret_exc_lead1m", "me", "gics", "ff49", chars), colClasses = c("eom"="character"))
+  data[, eom := eom %>% lubridate::fast_strptime(format = "%Y%m%d") %>% as.Date()]
   # ME CAP
   data <- nyse_size_cutoffs[, .(eom, nyse_p80)][data, on = "eom"]
   data[, me_cap := pmin(me, nyse_p80)][, nyse_p80 := NULL]
   # Screens
-  data <- data[source %in% data_source]
-  data <- data[!is.na(size_grp) & !is.na(me) & !is.na(ret_exc_lead1m)]
+  if (length(source) == 1) {
+    if (source == "CRSP") {
+      data <- data[source_crsp == 1]
+    }
+    if (source == "COMPUSTAT") {
+      data <- data[source_crsp == 0]
+    }
+  }
+  data <- data[!is.na(size_grp) & !is.na(me) & !is.na(ret_exc_lead1m)] # The ret_exc_lead1m screen assumes that investor knew at the beginning of the month that the security would delist. 
+  # Daily Returns
+  if (daily_pf) {
+    daily <- fread(paste0(data_path, "/Daily Returns/", excntry, ".csv"), colClasses = c("date"="character"))
+    daily[, date := date %>% lubridate::fast_strptime(format = "%Y%m%d") %>% as.Date()]
+    daily[, eom_lag1 := floor_date(date, unit="month")-1]
+  }
   # Winsorize Returns?
   if (wins_ret) {
-    data <- crsp_ret_cutoffs[, .("eom" = eom_lag1, "p001"=ret_exc_0_1, "p999"=ret_exc_99_9)][data, on = "eom"]
-    data[source == "COMPUSTAT" & ret_exc_lead1m > p999, ret_exc_lead1m := p999]
-    data[source == "COMPUSTAT" & ret_exc_lead1m < p001, ret_exc_lead1m := p001]
-    data[, c("source", "p001", "p999") := NULL]
+    data <- ret_cutoffs[, .("eom" = eom_lag1, "p001"=ret_exc_0_1, "p999"=ret_exc_99_9)][data, on = "eom"]
+    data[source_crsp == 0 & ret_exc_lead1m > p999, ret_exc_lead1m := p999]
+    data[source_crsp == 0 & ret_exc_lead1m < p001, ret_exc_lead1m := p001]
+    data[, c("source_crsp", "p001", "p999") := NULL]
+    if (daily_pf) {
+      daily[, year := year(date)]
+      daily[, month := month(date)]
+      daily <- ret_cutoffs_daily[, .(year, month, "p001"=ret_exc_0_1, "p999"=ret_exc_99_9)][daily, on = .(year, month)]
+      daily[source_crsp == 0 & ret_exc > p999, ret_exc := p999]
+      daily[source_crsp == 0 & ret_exc < p001, ret_exc := p001]
+      daily[, c("source_crsp", "p001", "p999", "year", "month") := NULL]
+    }
   }
   # Standardize to [-0.5, +0.5] interval (for signals)
   if (signals_standardize & signals) {
     data[, (chars) := lapply(.SD, function(x) frank(x, ties.method = "min", na.last = "keep")), .SDcols = chars, by = eom]
     data[, (chars) := lapply(.SD, as.numeric), .SDcols = chars]
     data[, (chars) := lapply(.SD, function(x) x / max(x, na.rm=T) - 0.5), .SDcols = chars, by = eom]
+  }
+  # Industry Portfolios 
+  if (ind_pf) {
+    ind_data <- data[, c("eom", "gics", "excntry", "ret_exc_lead1m", "me", "me_cap")]
+    ind_data <- ind_data[!is.na(gics)]
+    # Get first 2 digits of GICS code for industry groups
+    ind_data[, gics := as.numeric(substr(ind_data$gics, 1, 2))]
+    ind_gics <- ind_data[, .(
+      n = .N,
+      excntry = str_to_upper(excntry),
+      ret_ew = mean(ret_exc_lead1m),
+      ret_vw = sum(ret_exc_lead1m * me) / sum(me),
+      ret_vw_cap = sum(ret_exc_lead1m * me_cap) / sum(me_cap) 
+    ), by = .(gics, eom)]
+    # Lead month to match using leaded returns
+    ind_gics[, eom := ceiling_date(eom+1, unit = "month")-1]
+    ind_gics <- ind_gics[n >= bp_min_n]
+    # Estimate industry portfolios by Fama-French portfolios for US data
+    if (excntry == "usa"){
+      ind_data <- data[, c("eom", "ff49", "excntry", "ret_exc_lead1m", "me", "me_cap")]
+      ind_data <- ind_data[!is.na(ff49)]
+      ind_ff49 <- ind_data[, .(
+        n = .N,
+        excntry = str_to_upper(excntry),
+        ret_ew = mean(ret_exc_lead1m),
+        ret_vw = sum(ret_exc_lead1m * me) / sum(me),
+        ret_vw_cap = sum(ret_exc_lead1m * me_cap) / sum(me_cap) 
+      ), by = .(ff49, eom)]
+      ind_ff49[, eom := ceiling_date(eom+1, unit = "month")-1]
+      ind_ff49 <- ind_ff49[n >= bp_min_n]
+    }
   }
   # Prepare output list
   output <- list()
@@ -139,7 +196,7 @@ portfolios <- function(
     data[, var := as.double(get(x))]
     # Unless we need to compute signals, limit size of data
     if(!signals) {
-      sub <- data[!is.na(var), .(eom, var, size_grp, ret_exc_lead1m, me, me_cap, crsp_exchcd, comp_exchg)]
+      sub <- data[!is.na(var), .(id, eom, var, size_grp, ret_exc_lead1m, me, me_cap, crsp_exchcd, comp_exchg)]
     } else {
       sub <- data[!is.na(var)]
     }
@@ -185,13 +242,38 @@ portfolios <- function(
         pf_signals[, eom := ceiling_date(eom+1, unit = "month")-1]  # Reflect the fact that returns are leaded
         op$signals <- pf_signals
       }
+      # Daily Portfolios
+      if (daily_pf) {
+        # Keep weights constant throughout month
+        weights <- sub[, .(id, w_ew = 1/.N, w_vw = me/sum(me), w_vw_cap = me_cap/sum(me_cap)), by = .(eom, pf)]
+        daily_sub <- weights[daily, on = .(id, eom=eom_lag1)][!is.na(pf) & !is.na(ret_exc)]
+        op$pf_daily <- daily_sub[, .(
+          n = .N,
+          ret_ew = sum(w_ew*ret_exc),
+          ret_vw = sum(w_vw*ret_exc),
+          ret_vw_cap = sum(w_vw_cap*ret_exc)
+        ), by = .(pf, date)][, characteristic := x]
+      }
+      op$pf_daily <- op$pf_daily[n >= bp_min_n]
       # Output
       return(op)  
     } 
   })
   output$pf_returns <- char_pfs %>% lapply(function(x) x$pf_returns) %>% rbindlist()
+  if (daily_pf) {
+    output$pf_daily <- char_pfs %>% lapply(function(x) x$pf_daily) %>% rbindlist()
+  }
+  if (ind_pf) {
+    output$gics_returns <- ind_gics
+    if (excntry == "usa") {
+      output$ff49_returns <- ind_ff49
+    }
+  }
   if (nrow(output$pf_returns) != 0) {
     output$pf_returns[, excntry := str_to_upper(excntry)]
+    if (daily_pf) {
+      output$pf_daily[, excntry := str_to_upper(unique(output$pf_returns[, excntry]))]
+    }
     if (signals) {
       output$signals <- char_pfs %>% lapply(function(x) x$signals) %>% rbindlist()
       output$signals[, excntry := str_to_upper(excntry)]
@@ -255,9 +337,12 @@ nyse_size_cutoffs <- fread(paste0(data_path, "/nyse_cutoffs.csv"), colClasses = 
 nyse_size_cutoffs[, eom := as.Date(eom, format = "%Y%m%d")]
 
 # CRSP Return Cutoffs
-crsp_ret_cutoffs <- fread(paste0(data_path, "/crsp_return_cutoffs.csv"), colClasses = c("eom"="character"))
-crsp_ret_cutoffs[, eom := as.Date(eom, format = "%Y%m%d")]
-crsp_ret_cutoffs[, eom_lag1 := floor_date(eom, unit = "month") - 1]  # Because we use ret_exc_lead1m
+ret_cutoffs <- fread(paste0(data_path, "/return_cutoffs.csv"), colClasses = c("eom"="character"))
+ret_cutoffs[, eom := as.Date(eom, format = "%Y%m%d")]
+ret_cutoffs[, eom_lag1 := floor_date(eom, unit = "month") - 1]  # Because we use ret_exc_lead1m
+if (settings$daily_pf) {
+  ret_cutoffs_daily <- fread(paste0(data_path, "/return_cutoffs_daily.csv")) 
+}
 
 # Market 
 market <- fread(paste0(data_path, "/market_returns.csv"), colClasses = c("eom"="character"))
@@ -270,7 +355,7 @@ portfolio_data <- countries %>% lapply(function(ex) {
     data_path = data_path,
     excntry = ex, 
     chars = chars, 
-    data_source = settings$data_source, 
+    source = settings$source, 
     wins_ret = settings$wins_ret, 
     pfs=settings$pfs, 
     bps=settings$bps, 
@@ -280,14 +365,45 @@ portfolio_data <- countries %>% lapply(function(ex) {
     signals_standardize=settings$signals$standardize, 
     signals_w=settings$signals$weight, 
     nyse_size_cutoffs = nyse_size_cutoffs, 
-    crsp_ret_cutoffs = crsp_ret_cutoffs
+    daily_pf = settings$daily_pf,
+    ind_pf = settings$ind_pf, 
+    ret_cutoffs = ret_cutoffs,
+    ret_cutoffs_daily = ret_cutoffs_daily
   )
 })
 
-# Extract Portfolio Returns
+# Daily Data
+if (settings$daily_pf) {
+  # Daily Portfolio Returns
+  pf_daily <- portfolio_data %>% lapply(function(x) x$pf_daily) %>% rbindlist() 
+  pf_daily %>% setorder(excntry, characteristic, pf, date)
+  # Daily Long-Short Factors
+  hml_daily <- pf_daily[, .(
+    pfs = sum(pf == settings$pfs) + sum(pf == 1),
+    n_stocks = n[pf==settings$pfs] + n[pf==1],
+    n_stocks_min = as.integer(min(n[pf==settings$pfs], n[pf==1])),
+    ret_ew = ret_ew[pf==settings$pfs] - ret_ew[pf==1],
+    ret_vw = ret_vw[pf==settings$pfs] - ret_vw[pf==1],
+    ret_vw_cap = ret_vw_cap[pf==settings$pfs] - ret_vw_cap[pf==1]
+  ), .(excntry, characteristic, date)]
+  hml_daily <- hml_daily[pfs == 2][, pfs := NULL]
+  lms_daily <- char_info[hml_daily, on = "characteristic"]
+  resign_cols <- c("ret_ew", "ret_vw", "ret_vw_cap")
+  lms_daily[, (resign_cols) := lapply(.SD, function(x) x*direction), .SDcols=resign_cols]
+}
+
+# Monthly Portfolio Returns
 pf_returns <- portfolio_data %>% lapply(function(x) x$pf_returns) %>% rbindlist() 
 pf_returns <- pf_returns %>% select(excntry, characteristic, pf, eom, n, signal, ret_ew, ret_vw, ret_vw_cap)
 pf_returns %>% setorder(excntry, characteristic, pf, eom)
+
+# GICS Returns 
+if (settings$ind_pf) {
+  gics_returns <- portfolio_data %>% lapply(function(x) x$gics_returns) %>% rbindlist()
+  gics_returns %>% setorder(excntry, gics, eom)
+  ff49_returns <- portfolio_data[[which(countries == "usa")]]$ff49_returns
+  ff49_returns %>% setorder(excntry, ff49, eom)
+}
 
 # Create HML Returns
 hml_returns <- pf_returns[, .(
@@ -358,6 +474,15 @@ if(!is.null(legacy_path)) {
   hml_returns[eom <= settings$end_date] %>% fwrite(file = paste0(folder, "/hml.csv"))
   lms_returns[eom <= settings$end_date] %>% fwrite(file = paste0(folder, "/lms.csv"))
   cmp_returns[eom <= settings$end_date] %>% fwrite(file = paste0(folder, "/cmp.csv"))
+  if (settings$daily_pf) {
+    pf_daily[eom <= settings$end_date] %>% fwrite(file = paste0(folder, "/pf_daily.csv"))
+  }
+  if (settings$ind_pf) {
+    gics_returns[eom <= settings$end_date] %>% fwrite(file = paste0(folder, "/gics_ret.csv"))
+    if (nrow(ff49_returns) != 0) {
+      ff49_returns[eom <= settings$end_date] %?% fwrite(file = paste0(folder, "/ff49_ret.csv"))
+    }
+  }
 }
 # Save Most Recent Files
 market[eom <= settings$end_date] %>% fwrite(file = paste0(output_path, "/market_returns.csv"))
@@ -365,6 +490,16 @@ pf_returns[eom <= settings$end_date] %>% fwrite(file = paste0(output_path, "/pfs
 hml_returns[eom <= settings$end_date] %>% fwrite(file = paste0(output_path, "/hml.csv"))
 lms_returns[eom <= settings$end_date] %>% fwrite(file = paste0(output_path, "/lms.csv"))
 cmp_returns[eom <= settings$end_date] %>% fwrite(file = paste0(output_path, "/cmp.csv"))
+if (settings$daily_pf) {
+  pf_daily[date <= settings$end_date] %>% fwrite(file = paste0(output_path, "/pfs_daily.csv"))
+  pf_daily[date <= settings$end_date] %>% fwrite(file = paste0(output_path, "/lms_daily.csv"))
+}
+if (settings$ind_pf) {
+  gics_returns[eom <= settings$end_date] %>% fwrite(file = paste0(folder, "/gics_ret.csv"))
+  if (nrow(ff49_returns) != 0) {
+    ff49_returns[eom <= settings$end_date] %?% fwrite(file = paste0(folder, "/ff49_ret.csv"))
+  }
+}
 # Save Regional Factors
 reg_folder <- paste0(output_path, "/Regional Factors")
 if (!dir.exists(reg_folder)) {
