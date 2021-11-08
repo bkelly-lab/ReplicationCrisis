@@ -18,6 +18,7 @@ proc delete data = _all_ ; run ;
 * Libraries and Functions
 *************************************************************************** ; 
 * Libraries;
+options dlcreatedir;
 libname scratch "&scratch_folder."; 
 libname project "&project_folder.";
 
