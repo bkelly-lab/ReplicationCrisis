@@ -1,10 +1,26 @@
 # CHANGELOG.md
 This change log keeps track of changes to the underlying dataset. In brackets, we highlight versions of importance. The version with _factor dataset_ is the basis of the factor portfolios we upload at [https://www.bryankellyacademic.org/](https://www.bryankellyacademic.org/). The version with _paper dataset_ is the the basis of the current version of [Jensen, Kelly and Pedersen (2021)](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=3774514).
 
-## 27-08-2021 [Paper Dataset][Factor Dataset]
+## 16-11-2021 [Factor Dataset]
 
 __Changes__:
-- Fixed a bug regarding how daily delisting returns from CRSP is incorporated
+- Changed return cutoffs to depend on all stocks, instead of only stocks from CRSP.
+- Added monthly and daily returns to the output folder. 
+- Changed the 'source' (character) column to 'source_crsp' (integer),. source_crsp is 1 if CRSP is the return data source.
+- Changed the 'id' column from character to integer. For stocks from CRSP, the id is just their permno. For stocks from Compustat, the first digits is 1 if the stocks is traded on a US exchange, 2 if it's traded on a Canadian exchange, and 3 otherwise. The next two digits are the IID from Compustat, and the remaining six digits are the gvkey.  
+- Adapted the primary_sec column such that all observations from CRSP have primary_sec=1. 
+- Previously, we treated a zero return as a missing observation. Now, we have removed this screen, such that a zero return is treated like any other return. 
+- Previously, we winsorized daily returns, market equity, and dollar volume, before creating charactersitics based on daily stock market data. Now, we have removed this winsorization, and daily characteristics are based on the raw data. 
+- Added the option to create daily factor return in the portfolios.R code.
+- Added the option to create industry returns in the portfolios.R code.
+
+__Impact__:
+- Replication rate: 83.2%.
+
+## 27-08-2021 [Paper Dataset]
+
+__Changes__:
+- Fixed a bug regarding how daily delisting returns from CRSP is incorporated.
 - Added indfmt='FS' to the international accounting data. 
 
 __Impact__:
@@ -86,4 +102,3 @@ __Changes__:
 __Impact__:
 
 - Replication Rate: 84.9%
-

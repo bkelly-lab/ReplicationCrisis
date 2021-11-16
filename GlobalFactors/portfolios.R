@@ -16,9 +16,9 @@ library(data.table)
 
 # User Input -----------------------
 # Paths
-data_path <- "../../Data"
-output_path <- "../../PaperFactors"
-legacy_path <- "../../../Pre-Public/Data"
+data_path <- "Data"
+output_path <- "PaperFactors"
+legacy_path <- "Legacy"
 # Countries
 countries <- list.files(path = paste0(data_path, "/Characteristics")) %>% str_remove(".csv")
 # Chars 
@@ -253,8 +253,8 @@ portfolios <- function(
           ret_vw = sum(w_vw*ret_exc),
           ret_vw_cap = sum(w_vw_cap*ret_exc)
         ), by = .(pf, date)][, characteristic := x]
+        op$pf_daily <- op$pf_daily[n >= bp_min_n]
       }
-      op$pf_daily <- op$pf_daily[n >= bp_min_n]
       # Output
       return(op)  
     } 
@@ -492,7 +492,7 @@ lms_returns[eom <= settings$end_date] %>% fwrite(file = paste0(output_path, "/lm
 cmp_returns[eom <= settings$end_date] %>% fwrite(file = paste0(output_path, "/cmp.csv"))
 if (settings$daily_pf) {
   pf_daily[date <= settings$end_date] %>% fwrite(file = paste0(output_path, "/pfs_daily.csv"))
-  pf_daily[date <= settings$end_date] %>% fwrite(file = paste0(output_path, "/lms_daily.csv"))
+  lms_daily[date <= settings$end_date] %>% fwrite(file = paste0(output_path, "/lms_daily.csv"))
 }
 if (settings$ind_pf) {
   gics_returns[eom <= settings$end_date] %>% fwrite(file = paste0(folder, "/gics_ret.csv"))

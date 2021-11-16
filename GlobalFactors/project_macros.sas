@@ -366,7 +366,7 @@ Importantly, a given company (gvkey) can potentially have up to 3 primary securi
 		   a.ret, a.retx, a.cfacshr, a.vol, 
 		   case when a.prc > 0 and a.askhi > 0 then a.askhi else . end as prc_high,  /* Highest price when prc is not the bid-ask average: https://wrds-web.wharton.upenn.edu/wrds/query_forms/variable_documentation.cfm?vendorCode=CRSP&libraryCode=crspa&fileCode=dsf&id=askhi*/
 		   case when a.prc > 0 and a.bidlo > 0 then a.bidlo else . end as prc_low,    /* Lowest price when prc is not the bid-ask average: https://wrds-web.wharton.upenn.edu/wrds/query_forms/variable_documentation.cfm?vendorCode=CRSP&libraryCode=crspa&fileCode=dsf&id=bidlo */
-		   b.shrcd, b.exchcd, c.gvkey, c.liid as iid, c.linkprim in ('P', 'C') as primary_sec, /*http://www.crsp.org/products/documentation/crspccmlink-security-link-history*/
+		   b.shrcd, b.exchcd, c.gvkey, c.liid as iid, /*http://www.crsp.org/products/documentation/crspccmlink-security-link-history*/
 		   b.exchcd in (1, 2, 3) as exch_main			
 		from crsp.&freq.sf as a 
 		left join crsp.&freq.senames as b
@@ -449,34 +449,19 @@ Importantly, a given company (gvkey) can potentially have up to 3 primary securi
 		group by permco, date;
 	quit;
 	
-	* Create Primary Sec for Stocks with misisng GVKEY (primarily neccesary prior to 1950);
-	proc sql;
-		create table __crsp_sf7 as
-		select *, max(dolvol) as max_dolvol
-		from __crsp_sf6
-		group by permco, date;
-		
-		update __crsp_sf7		/*For CRSP data ending in 2019. 618.458 out of 630.910 with missing(gvkey) or missing(iid) are updated from 0 to 1 */
-		set primary_sec=1
-		where (missing(gvkey) or missing(iid)) and dolvol=max_dolvol;  /* If no GVKEY is available, choose security with the highest dollar volume as the primary security in that month */
-		
-		alter table __crsp_sf7
-		drop max_dolvol;
-	quit;
-	
 	* Make volume comparable across daily and monthly set:  https://wrds-web.wharton.upenn.edu/wrds/query_forms/variable_documentation.cfm?vendorCode=CRSP&libraryCode=crspa&fileCode=dsf&id=vol;
 	%if &freq.=m %then %do;
 		proc sql;
-			update __crsp_sf7
+			update __crsp_sf6
 			set vol = vol*100,
 			    dolvol = dolvol*100;
 		quit;
 	%end;
 	
-	proc sort nodupkey data=__crsp_sf7; by permno date; run; /*In monthly file: Two duplicates 15075-20180131 and 86812-20190731 In daily file 13 obs*/
-	data crsp_&freq.sf; set __crsp_sf7;
+	proc sort nodupkey data=__crsp_sf6; by permno date; run; /*In monthly file: Two duplicates 15075-20180131 and 86812-20190731 In daily file 13 obs*/
+	data crsp_&freq.sf; set __crsp_sf6;
 	
-	proc delete data= __crsp_sf1 __crsp_sf2 __crsp_sf3 __crsp_sf4 __crsp_sf5 __crsp_sf6 __crsp_sf7; 
+	proc delete data= __crsp_sf1 __crsp_sf2 __crsp_sf3 __crsp_sf4 __crsp_sf5 __crsp_sf6; 
 %mend prepare_crsp_sf;
 
 **********************************************************************************************************************
@@ -790,7 +775,7 @@ Importantly, a given company (gvkey) can potentially have up to 3 primary securi
 	/* Monthly Files */
 	proc sql;
 		create table __msf_world1 as
-		select permno as id, permno, permco, gvkey, iid, 'USA' as excntry length=3, exch_main, (shrcd in (10, 11, 12)) as common,  primary_sec,
+		select permno as id, permno, permco, gvkey, iid, 'USA' as excntry length=3, exch_main, (shrcd in (10, 11, 12)) as common, 1 as primary_sec,
 			bidask, shrcd as crsp_shrcd, exchcd as crsp_exchcd, '' as comp_tpci, . as comp_exchg,
 			'USD' as curcd, 1 as fx, date, intnx('month',date,0,'E') as eom format=YYMMDDN8., 
 		   	cfacshr as adjfct, shrout as shares, me, me_company, prc, prc as prc_local, prc_high, prc_low, dolvol, vol as tvol, 
@@ -820,7 +805,7 @@ Importantly, a given company (gvkey) can potentially have up to 3 primary securi
 	/* Daily Files */
 	proc sql;
 		create table __dsf_world1 as
-		select permno as id, 'USA' as excntry length=3, exch_main, (shrcd in (10, 11, 12)) as common, primary_sec, 
+		select permno as id, 'USA' as excntry length=3, exch_main, (shrcd in (10, 11, 12)) as common, 1 as primary_sec, 
 			bidask, 'USD' as curcd, 1 as fx, DATE as date format=YYMMDDN8., intnx('month',DATE,0,'E') as eom format=YYMMDDN8., 
 		   	cfacshr as adjfct, shrout as shares, me, dolvol, vol as tvol, prc, prc_high, prc_low,
 		   	ret as ret_local, RET as ret, ret_exc, 1 as ret_lag_dif, 1 as source_crsp /* More memory efficient with integer instead of character vector*/ 
@@ -840,7 +825,7 @@ Importantly, a given company (gvkey) can potentially have up to 3 primary securi
 	* If multiple observations for the same GVKEY-IID, Then choose CRSP as the main observation;
 	proc sql;
 		create table __obs_main as 
-		select id, gvkey, iid, eom, (count(gvkey) in (0, 1) or (count(gvkey)=2 and source_crsp=1)) as obs_main
+		select id, gvkey, iid, eom, (count(gvkey) in (0, 1) or (count(gvkey)>1 and source_crsp=1)) as obs_main
 		from __msf_world2
 		group by gvkey, iid, eom;
 		
@@ -1212,17 +1197,18 @@ Importantly, a given company (gvkey) can potentially have up to 3 primary securi
 	quit;
 	
 	/* Create country .csv files */
-	option nonotes;
 	%do i=1 %to %nwords(&countries.);
-		%let __c = %scan(&countries., &i., %str(' '));
 		%put ################ "&path./&__c..csv" ########################;
+		option nonotes;
+		%let __c = %scan(&countries., &i., %str(' '));		
 		proc export data=main_data3(where=(excntry = upcase("&__c.")))
 		    outfile="&path./&__c..csv"   
 		    dbms=CSV
 		    replace;
 		run;
+		option notes;
 	%end;
-	option notes;
+	
 	
 	* Zip file for easier download;
 	ods package (newzip) open nopf;

@@ -194,6 +194,7 @@ proc sort data=world_data5 out=scratch.world_data nodup; by id eom; run;
 options dlcreatedir;
 libname op "&scratch_folder./output"; 
 
+option nonotes;
 * Small Files;
 proc export data=scratch.market_returns_daily
     outfile="&scratch_folder./output/market_returns_daily.csv"   
@@ -220,14 +221,15 @@ proc export data=scratch.return_cutoffs_daily
     dbms=CSV
     replace;
 run;
+option notes;
 
 * Save main data as .csv files by country;
 %if &save_csv.=1 %then %do;
-	%save_main_data_csv(out=world, data=scratch.world_data, path=&scratch_folder./output, end_date=&end_date.); 
+	%save_main_data_csv(out=Characteristics, data=scratch.world_data, path=&scratch_folder./output, end_date=&end_date.); 
 %end;
 * Save daily return data as .csv files by country;
 %if &save_daily_ret.=1 %then %do;
-	%save_daily_ret_csv(out=world_ret_daily, data=scratch.world_dsf, path=&scratch_folder./output);
+	%save_daily_ret_csv(out=Daily Returns, data=scratch.world_dsf, path=&scratch_folder./output);
 %end;
 * Save monthly return data as .csv files by country;
 %if &save_monthly_ret.=1 %then %do;
