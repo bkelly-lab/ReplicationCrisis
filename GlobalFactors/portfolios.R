@@ -449,7 +449,7 @@ if (settings$daily_pf) {
 }
 
 # Regional Portfolios ------------------------------------------------
-regional_data <- function(data, mkt, date_col, countries, weighting, countries_min, periods_min, stocks_min) {
+regional_data <- function(data, mkt, date_col, char_col, countries, weighting, countries_min, periods_min, stocks_min) {
   # Determine Country Weights
   weights <- mkt[, .(excntry, get(date_col), mkt_vw_exc, "country_weight" = case_when(
     weighting == "market_cap" ~ me_lag1,
@@ -459,41 +459,64 @@ regional_data <- function(data, mkt, date_col, countries, weighting, countries_m
   weights %>% setnames(old="V2", new="date_col")
   # Portfolio Return 
   pf <- data[excntry %in% countries & n_stocks_min >= stocks_min] 
-  pf %>% setnames(old=date_col, new="date_col")
+  pf %>% setnames(old=c(date_col, char_col), new = c("date_col", "char_col"))
   pf <- weights[pf, on = .(excntry, date_col)]
-  pf <- pf[, .(
+  pf <- pf[!is.na(mkt_vw_exc), .(  
     n_countries = .N,
     direction = unique(direction),
     ret_ew = sum(ret_ew*country_weight) / sum(country_weight),
     ret_vw = sum(ret_vw*country_weight) / sum(country_weight),
     ret_vw_cap = sum(ret_vw_cap*country_weight) / sum(country_weight),
     mkt_vw_exc = sum(mkt_vw_exc * country_weight) / sum(country_weight) 
-  ), by = .(characteristic, date_col)]
+  ), by = .(char_col, date_col)]
   # Minimum Requirement: Countries
   pf <- pf[n_countries >= countries_min]
   # Minimum Requirement: Months
-  pf[, periods := .N, by = .(characteristic)]
+  pf[, periods := .N, by = .(char_col)]
   pf <- pf[periods >= periods_min][, periods := NULL]
-  pf %>% setnames(old = "date_col", new = date_col)
+  pf %>% setorder(char_col, date_col)
+  pf %>% setnames(old = c("date_col", "char_col"), new = c(date_col, char_col))
   return(pf)
 }
+# Regional Factors
 regional_pfs <- 1:nrow(regions) %>% lapply(function(i) {
   info <- regions[i, ]
-  reg_pf <- lms_returns %>% regional_data(mkt=market, countries = unlist(info$country_codes), date_col = "eom", 
+  reg_pf <- lms_returns %>% regional_data(mkt=market, countries = unlist(info$country_codes), date_col = "eom", char_col = "characteristic", 
                                           weighting = settings$regional_pfs$country_weights,
                                           countries_min = info$countries_min, periods_min = settings$regional_pfs$months_min, 
                                           stocks_min = settings$regional_pfs$stocks_min)
   reg_pf %>% mutate(region = info$name) %>% select(region, characteristic, direction, eom, n_countries, ret_ew, ret_vw, ret_vw_cap, mkt_vw_exc)
-}) %>% bind_rows() 
+}) %>% rbindlist() 
 if (settings$daily_pf) {
   regional_pfs_daily <- 1:nrow(regions) %>% lapply(function(i) {
     info <- regions[i, ]
-    reg_pf <- lms_daily %>% regional_data(mkt=market_daily, countries = unlist(info$country_codes), date_col = "date", 
+    reg_pf <- lms_daily %>% regional_data(mkt=market_daily, countries = unlist(info$country_codes), date_col = "date", char_col = "characteristic", 
                                           weighting = settings$regional_pfs$country_weights,
                                           countries_min = info$countries_min, periods_min = settings$regional_pfs$months_min*21, 
                                           stocks_min = settings$regional_pfs$stocks_min)
     reg_pf %>% mutate(region = info$name) %>% select(region, characteristic, direction, date, n_countries, ret_ew, ret_vw, ret_vw_cap, mkt_vw_exc)
-  }) %>% bind_rows() 
+  }) %>% rbindlist() 
+}
+# Regional Cluster Portfolios
+regional_clusters <- 1:nrow(regions) %>% lapply(function(i) {
+  info <- regions[i, ]
+  reg_pf <- cluster_pfs %>% rename("n_stocks_min"=n_factors) %>% mutate(direction = NA_real_) %>% # Hack to make the function applicable
+    regional_data(mkt=market, countries = unlist(info$country_codes), date_col = "eom", char_col = "cluster",
+                  weighting = settings$regional_pfs$country_weights,
+                  countries_min = info$countries_min, periods_min = settings$regional_pfs$months_min, 
+                  stocks_min = 1)
+  reg_pf %>% mutate(region = info$name) %>% select(region, cluster, eom, n_countries, ret_ew, ret_vw, ret_vw_cap, mkt_vw_exc)
+}) %>% rbindlist() 
+if (settings$daily_pf) {
+  regional_clusters_daily <- 1:nrow(regions) %>% lapply(function(i) {
+    info <- regions[i, ]
+    reg_pf <- cluster_pfs_daily %>% rename("n_stocks_min"=n_factors) %>% mutate(direction = NA_real_) %>% # Hack to make the function applicable
+      regional_data(mkt=market_daily, countries = unlist(info$country_codes), date_col = "date", char_col = "cluster", 
+                    weighting = settings$regional_pfs$country_weights,
+                    countries_min = info$countries_min, periods_min = settings$regional_pfs$months_min*21, 
+                    stocks_min = 1)
+    reg_pf %>% mutate(region = info$name) %>% select(region, cluster, date, n_countries, ret_ew, ret_vw, ret_vw_cap, mkt_vw_exc)
+  }) %>% rbindlist() 
 }
 
 # Save ----------------
@@ -537,7 +560,7 @@ if (settings$ind_pf) {
   }
 }
 
-# Save Regional Factors
+# Regional Factors
 reg_folder <- paste0(output_path, "/Regional Factors")
 if (!dir.exists(reg_folder)) {
   dir.create(reg_folder)
@@ -554,6 +577,24 @@ if (settings$daily_pf) {
     regional_pfs_daily[date <= settings$end_date & region %in% reg] %>% fwrite(file = paste0(reg_folder_daily, "/", str_to_sentence(reg), ".csv"))
   }
 }
+# Regional Clusters
+reg_folder <- paste0(output_path, "/Regional Clusters")
+if (!dir.exists(reg_folder)) {
+  dir.create(reg_folder)
+}
+for (reg in unique(regional_clusters$region)) {
+  regional_clusters[eom <= settings$end_date & region %in% reg] %>% fwrite(file = paste0(reg_folder, "/", str_to_sentence(reg), ".csv"))
+}
+if (settings$daily_pf) {
+  reg_folder_daily <- paste0(output_path, "/Regional Clusters Daily")
+  if (!dir.exists(reg_folder_daily)) {
+    dir.create(reg_folder_daily)
+  }
+  for (reg in unique(regional_clusters_daily$region)) {
+    regional_clusters_daily[date <= settings$end_date & region %in% reg] %>% fwrite(file = paste0(reg_folder_daily, "/", str_to_sentence(reg), ".csv"))
+  }
+}
+
 # Save Long/Short Factors by Country
 cnt_folder <- paste0(output_path, "/Country Factors")
 if (!dir.exists(cnt_folder)) {
