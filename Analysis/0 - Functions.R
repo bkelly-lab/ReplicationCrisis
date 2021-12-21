@@ -74,7 +74,8 @@ block_cluster_func <- function(cor_mat, cl_lables) {
 }
 
 # Empirical Bayes ----------------
-emp_bayes <- function(data, cluster_labels, min_obs = 5 * 12, fix_alpha = F, bs_cov = F, cor_type = "sample", shrinkage = 0, layers = 3, bs_samples = 10000, priors = NULL, sigma = NULL, plot = T) { # cor_type %in% c("raw", "block_2", "block_clusters")
+emp_bayes <- function(data, cluster_labels, min_obs = 5 * 12, fix_alpha = F, bs_cov = F, cor_type = "sample", shrinkage = 0, layers = 3, bs_samples = 10000, seed, priors = NULL, sigma = NULL, plot = T) { # cor_type %in% c("raw", "block_2", "block_clusters")
+  set.seed(seed)
   y_raw <- data$wide %>% select(-eom) %>% as.matrix()
   obs <- y_raw %>% apply(2, function(x) sum(!is.na(x)))
   y <- y_raw[, obs >= min_obs]
@@ -102,8 +103,8 @@ emp_bayes <- function(data, cluster_labels, min_obs = 5 * 12, fix_alpha = F, bs_
       rownames(alpha_cor) <- names(alpha_sd)
       
     } else {
-      y_sd <- y %>% apply(2, sd) 
-      y_scor <- y %>% cor()  
+      y_sd <- y %>% apply(2, sd, na.rm=T) 
+      y_scor <- y %>% cor(use = "complete.obs")  
       alpha_sd <- y_sd / sqrt(nrow(y))
       alpha_cor <- y_scor
     }
@@ -246,18 +247,21 @@ emp_bayes <- function(data, cluster_labels, min_obs = 5 * 12, fix_alpha = F, bs_
         a_vec <- rep(a, n_fcts)
         a_omega <- omega_func(layers = layers, tau_c = tc, tau_s = ts, tau_w = tw)
         
-        a_cov <- sigma + a_omega  #  / t_mat
+        a_cov <- sigma + a_omega  
         
-        -(mvtnorm::dmvnorm(x = y_mean, mean = a_vec, sigma = a_cov, log = T))  #  + dgamma(param[2], 2, 5, log = T)*sum(mm)/2  + dgamma(param[3], 2, 10, log = T)*140 
+        -(mvtnorm::dmvnorm(x = y_mean, mean = a_vec, sigma = a_cov, log = T))
       }
     }
     
-    if (fix_alpha) {
-      (hyper_pars <- stats4::mle(minuslogl = mle_func, start = start_list, lower = c(-Inf, 0, 0, 0)[1:length(start_list)], fixed = list(a = 0)))
-    } else {
-      (hyper_pars <- stats4::mle(minuslogl = mle_func, start = start_list, lower = c(-Inf, 0, 0, 0)[1:length(start_list)]))
+    # Maximum likelihood estimation
+    for (k in 1:10) {
+      initial_params <- start_list %>% lapply(function(x) max(x+rnorm(1, mean = 0, sd = 0.01), 0)) # Max is just to ensure that variances are not negative, never in use
+      if (fix_alpha) {
+        (hyper_pars <- stats4::mle(minuslogl = mle_func, start = initial_params, lower = c(-Inf, 0, 0, 0)[1:length(start_list)], fixed = list(a = 0)))
+      } else {
+        (hyper_pars <- stats4::mle(minuslogl = mle_func, start = initial_params, lower = c(-Inf, 0, 0, 0)[1:length(start_list)]))
+      }
     }
-    
     # Check convergence
     if (hyper_pars@details$convergence != 0) {
       warning("MLE step did not converge!!!")
@@ -793,6 +797,7 @@ trading_on_significance <- function(posterior_is) {
 
 # Simulation according to specification for Harvey et al (2016)
 harvey_et_al_sim <- function(sim_settings, seed) {
+  set.seed(seed)
   # Cluster membership
   m <- matrix(0, nrow = sim_settings$n, ncol = sim_settings$cl)  # Cluster membership
   j <- 0

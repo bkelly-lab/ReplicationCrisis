@@ -31,26 +31,20 @@ eb_est <- search_list %>% sapply(simplify = F, USE.NAMES = T, function(x) {
       overlapping = settings$eb$overlapping 
     )
   # Run Empirical Bayes
-  set.seed(settings$seed)  # Seed due to bootstrap
-  for (i in 1:10) {
-    op <- data %>% 
-      emp_bayes( 
-        cluster_labels = cluster_labels, 
-        min_obs = settings$eb$min_obs,
-        fix_alpha = settings$eb$fix_alpha, 
-        bs_cov = settings$eb$bs_cov, 
-        layers = x[[3]], 
-        shrinkage = settings$eb$shrinkage, 
-        cor_type = settings$eb$cor_type, 
-        bs_samples = settings$eb$bs_samples
-      )
-    if (is.null(op)) {
-      print(paste("---> MLE failure happened for", x[[1]], x[[2]], ifelse(length(x)==4, x[[4]], "")))
-    } else {
-      print(paste("--->", x[[1]], x[[2]], ifelse(length(x)==4, x[[4]], ""), "converged after", i, "attempts"))
-      return(op) 
-    }
-  }
+  op <- data %>% 
+    emp_bayes( 
+      cluster_labels = cluster_labels, 
+      min_obs = settings$eb$min_obs,
+      fix_alpha = settings$eb$fix_alpha, 
+      bs_cov = settings$eb$bs_cov, 
+      layers = x[[3]], 
+      shrinkage = settings$eb$shrinkage, 
+      cor_type = settings$eb$cor_type, 
+      bs_samples = settings$eb$bs_samples, 
+      seed = settings$seed
+    )
+  # Output
+  return(op)
 })
 
 # Simulations EB vs. BY --------------
@@ -164,27 +158,19 @@ if (update_post_over_time) {
           overlapping = settings$eb$overlapping 
         )
       # Run Empirical Bayes
-      set.seed(settings$seed)  # Seed due to bootstrap
-      for (i in 1:10) {
-        eb_act <- data %>% 
-          emp_bayes( 
-            cluster_labels = cluster_labels, 
-            min_obs = settings$eb$min_obs,
-            fix_alpha = settings$eb$fix_alpha, 
-            bs_cov = settings$eb$bs_cov, 
-            layers = 2, 
-            shrinkage = settings$eb$shrinkage, 
-            cor_type = settings$eb$cor_type, 
-            bs_samples = 1000, 
-            priors = fixed_priors
-          )
-        if (is.null(eb_act)) {
-          print(paste("---> MLE failure happened for", end_date))
-        } else {
-          print(paste("--->", end_date, "converged after", i, "attempts"))
-          break 
-        }
-      }
+      eb_act <- data %>% 
+        emp_bayes( 
+          cluster_labels = cluster_labels, 
+          min_obs = settings$eb$min_obs,
+          fix_alpha = settings$eb$fix_alpha, 
+          bs_cov = settings$eb$bs_cov, 
+          layers = 2, 
+          shrinkage = settings$eb$shrinkage, 
+          cor_type = settings$eb$cor_type, 
+          bs_samples = 1000, 
+          priors = fixed_priors,
+          seed = settings$seed
+        )
       eb_act$input <- NULL
       eb_act$end_date <- end_date
       return(eb_act)
@@ -242,28 +228,20 @@ if (update_post_is) {
         overlapping = settings$eb$overlapping 
       )
     # Run Empirical Bayes
-    set.seed(settings$seed)  # Seed due to bootstrap
-    # Run at most 10 times if MLE fails to converge
-    for (i in 1:10) {
-      eb_act <- data %>% 
-        emp_bayes( 
-          cluster_labels = cluster_labels, 
-          min_obs = settings$eb$min_obs,
-          fix_alpha = settings$eb$fix_alpha, 
-          bs_cov = settings$eb$bs_cov, 
-          layers = 2, 
-          shrinkage = settings$eb$shrinkage, 
-          cor_type = settings$eb$cor_type, 
-          bs_samples = 1000
-        )
-      if (is.null(eb_act)) {
-        print(paste("---> MLE failure happened for", end_date))
-      } else {
-        print(paste("--->", end_date, "converged after", i, "attempts"))
-        return(eb_act$factors %>% mutate(est_date = end_date))
-      }
-    }
-    
+    eb_act <- data %>% 
+      emp_bayes( 
+        cluster_labels = cluster_labels, 
+        min_obs = settings$eb$min_obs,
+        fix_alpha = settings$eb$fix_alpha, 
+        bs_cov = settings$eb$bs_cov, 
+        layers = 2, 
+        shrinkage = settings$eb$shrinkage, 
+        cor_type = settings$eb$cor_type, 
+        bs_samples = 1000,
+        seed = settings$seed
+      )
+    # Output 
+    eb_act$factors %>% mutate(est_date = end_date)
   }) %>% bind_rows()
   posterior_is %>% saveRDS(file = paste0(object_path, "/posterior_is.RDS"))
 } else {
@@ -293,7 +271,7 @@ harvey_base$n <- harvey_base$cl * harvey_base$fct_pr_cl
 harvey_base$n_true <- harvey_base$cl_true * harvey_base$fct_pr_cl
 
 if (update_harvey_baseline) {
-  harvey_base_res <- harvey_et_al_sim(sim_settings = harvey_base, seed = set.seed(settings$seed))
+  harvey_base_res <- harvey_et_al_sim(sim_settings = harvey_base, seed = settings$seed)
   harvey_base_res <- list("settings" = harvey_base, "sim" = harvey_base_res)
   harvey_base_res %>% saveRDS(file = paste0(object_path, "/harvey_res_baseline.RDS"))
 } else {
@@ -322,7 +300,7 @@ harvey_worst$n <- harvey_worst$cl * harvey_worst$fct_pr_cl
 harvey_worst$n_true <- harvey_worst$cl_true * harvey_worst$fct_pr_cl
 
 if (update_harvey_worstcase) {
-  harvey_worst_res <- harvey_et_al_sim(sim_settings = harvey_worst, seed = set.seed(settings$seed))
+  harvey_worst_res <- harvey_et_al_sim(sim_settings = harvey_worst, seed = settings$seed)
   harvey_worst_res <- list("settings" = harvey_worst, "sim" = harvey_worst_res)
   harvey_worst_res %>% saveRDS(file = paste0(object_path, "/harvey_res_worstcase.RDS"))
 } else {
@@ -343,26 +321,18 @@ if (FALSE) {
       overlapping = settings$eb$overlapping # If we start in 1955-02-28 we lose 12 factors relative to starting in 1972-11-30
     )
   # Run Empirical Bayes
-  set.seed(settings$seed)  # Seed due to bootstrap
-  for (i in 1:10) {
-    op <- data %>% 
-      emp_bayes( 
-        cluster_labels = cluster_labels, 
-        min_obs = settings$eb$min_obs,
-        fix_alpha = settings$eb$fix_alpha, 
-        bs_cov = settings$eb$bs_cov, 
-        layers = 2, 
-        shrinkage = settings$eb$shrinkage, 
-        cor_type = settings$eb$cor_type, 
-        bs_samples = settings$eb$bs_samples
-      )
-    if (is.null(op)) {
-      print(paste("---> MLE failure"))
-    } else {
-      print(paste("---> converged after", i, "attempts"))
-      break
-    }
-  }
+  op <- data %>% 
+    emp_bayes( 
+      cluster_labels = cluster_labels, 
+      min_obs = settings$eb$min_obs,
+      fix_alpha = settings$eb$fix_alpha, 
+      bs_cov = settings$eb$bs_cov, 
+      layers = 2, 
+      shrinkage = settings$eb$shrinkage, 
+      cor_type = settings$eb$cor_type, 
+      bs_samples = settings$eb$bs_samples,
+      seed = settings$seed
+    )
   # OOS-replication rate
   op$factors %>%
     left_join(char_info %>% select(characteristic, significance), by = "characteristic") %>%
