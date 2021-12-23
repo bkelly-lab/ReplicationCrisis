@@ -261,13 +261,13 @@ emp_bayes <- function(data, cluster_labels, min_obs = 5 * 12, fix_alpha = F, bs_
       } else {
         (hyper_pars <- stats4::mle(minuslogl = mle_func, start = initial_params, lower = c(-Inf, 0, 0, 0)[1:length(start_list)]))
       }
+      if (hyper_pars@details$convergence==0) break
     }
     # Check convergence
     if (hyper_pars@details$convergence != 0) {
       warning("MLE step did not converge!!!")
       return(NULL)
-    }
-    stopifnot()  
+    } 
     
     mu <- hyper_pars@fullcoef["a"]
     tau_c <- hyper_pars@fullcoef["tc"]

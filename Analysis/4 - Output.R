@@ -80,7 +80,7 @@ output$figures$tpf_size <- tpf_size %>% plot_tpf_size(cluster_order = cluster_or
 output$figures$overtime <- posterior_over_time %>% plot_over_time(orig_sig = T, ols_incl = T, lb = 5)
 
 # Posterior over Time - Flexible Taus
-output$figures$overtime_flex <- posterior_over_time_flex %>% plot_over_time(orig_sig = T, ols_incl = F)
+output$figures$overtime_flex <- posterior_over_time_flex %>% plot_over_time(orig_sig = T, ols_incl = F, lb=5)
 
 # Posterior over Time - Flexible Taus - Plot taus
 output$figures$overtime_flex_taus <- posterior_over_time_flex %>% plot_taus_over_time() 
