@@ -1,5 +1,5 @@
 # CHANGELOG.md
-This change log keeps track of changes to the underlying dataset. In brackets, we highlight versions of importance. The version with _factor dataset_ is the basis of the factor portfolios we upload at [https://www.bryankellyacademic.org/](https://www.bryankellyacademic.org/). The version with _paper dataset_ is the the basis of the current version of [Jensen, Kelly and Pedersen (2021)](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=3774514).
+This change log keeps track of changes to the underlying dataset. In brackets, we highlight versions of importance. The version with _factor dataset_ is the basis of the factor portfolios we upload at [https://jkpfactors.com/](https://jkpfactors.com/). The version with _paper dataset_ is the the basis of the current version of [Jensen, Kelly and Pedersen (2021)](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=3774514).
 
 ## 16-11-2021 [Factor Dataset]
 
