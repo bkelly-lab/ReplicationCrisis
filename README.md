@@ -3,9 +3,9 @@ This repository contains the code used for the paper [Is There a Replication Cri
 
 The code consists of the following two self-contained components:
 
-- [GlobalFactors](https://github.com/bkelly-lab/ReplicationCrisis/tree/master/GlobalFactors) is a folder with code that creates data sets of global stock returns, stock characteristics, and global long-short factors. Note that the long-short factors can also be downloaded directly, both the factor returns used in the paper ([here](https://www.dropbox.com/sh/wcrjok1qyxtrasi/AABZ90GDCUvIzDzijt8Qoo3ha?dl=0)) and the latest version of the factor returns ([here](https://www.dropbox.com/sh/ep40dynf2w3lck4/AACYXMDxbGOv21lVK7OC4fq7a?dl=0)).
+- [GlobalFactors](https://github.com/bkelly-lab/ReplicationCrisis/tree/master/GlobalFactors) is a folder with code that creates data sets of global stock returns, stock characteristics, and global long-short factors. Note that the long-short factors can also be downloaded directly, both the factor returns used in the paper ([here](https://www.dropbox.com/sh/wcrjok1qyxtrasi/AABZ90GDCUvIzDzijt8Qoo3ha?dl=0)) and the latest version of the factor returns (see below).
 
 - [Analysis](https://github.com/bkelly-lab/ReplicationCrisis/tree/master/Analysis) is a folder that contains the analysis in the paper, including all figures and tables. This folder takes the global factors as input (either the ones that can be downloaded or the ones that you construct yourself). 
 
-
+The official website for this repo is [https://jkpfactors.com/](https://jkpfactors.com/), where the most recent long-short factors can be downloaded. 
 
