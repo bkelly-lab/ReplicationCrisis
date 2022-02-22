@@ -1,7 +1,16 @@
 # CHANGELOG.md
-This change log keeps track of changes to the underlying dataset. In brackets, we highlight versions of importance. The version with _factor dataset_ is the basis of the factor portfolios we upload at [https://jkpfactors.com/](https://jkpfactors.com/). The version with _paper dataset_ is the the basis of the current version of [Jensen, Kelly and Pedersen (2021)](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=3774514).
+This change log keeps track of changes to the underlying data set. In brackets, we highlight versions of importance. The version with _factor data set_ is the basis of the factor portfolios we upload at [https://jkpfactors.com/](https://jkpfactors.com/). The version with _paper data set_ is the the basis of the current version of [Jensen, Kelly and Pedersen (2021)](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=3774514).
 
-## 16-11-2021 [Factor Dataset]
+## 08-02-2022 [Paper data set] [Factor data set]
+
+__Changes__:
+- Fix error in the construction of intrinsic_value. Previously, we failed to scale intrinsic_value by market equity as done in Frankel and Lee (1998). We call the new characteristic ival_me and keep intrinsic_value in the data set. The alpha of the new factor based on ival_me is significantly different from zero, while the factor based on intrinsic_value is insignificant.
+
+__Impact__:
+- Replication rate: 82.4%. (added 2020 data)
+
+
+## 16-11-2021 
 
 __Changes__:
 - Changed return cutoffs to depend on all stocks, instead of only stocks from CRSP.
@@ -17,7 +26,7 @@ __Changes__:
 __Impact__:
 - Replication rate: 83.2%.
 
-## 27-08-2021 [Paper Dataset]
+## 27-08-2021 
 
 __Changes__:
 - Fixed a bug regarding how daily delisting returns from CRSP is incorporated.
@@ -42,7 +51,7 @@ __Impact__:
 
 __Changes__:
 
-- Previously we did not exclude securities that are only traded over the counter. In the new version of the dataset, we include an indicator column "exch_main" to exclude non-standard exchanges. In the US, the main exchanges are AMEX, NASDAQ and NYSE. Outside of the US, we exclude over the counter exchanges, stock connect exchanges in China and cross-country exchanges such as BATS Chi-X Europe. The documentation includes a full list of the excluded exchanges.  
+- Previously we did not exclude securities that are only traded over the counter. In the new version of the data set, we include an indicator column "exch_main" to exclude non-standard exchanges. In the US, the main exchanges are AMEX, NASDAQ and NYSE. Outside of the US, we exclude over the counter exchanges, stock connect exchanges in China and cross-country exchanges such as BATS Chi-X Europe. The documentation includes a full list of the excluded exchanges.  
 - Included SIC, NAICS and GICS industry codes.
 
 __Impact__:
@@ -97,7 +106,7 @@ __Impact__:
 ## 01-15-2021 
 __Changes__:
 
-  - Base dataset used in the first online version of Jensen, Kelly and Pedersen (2021).
+  - Base data set used in the first online version of Jensen, Kelly and Pedersen (2021).
   
 __Impact__:
 

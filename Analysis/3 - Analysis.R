@@ -79,11 +79,11 @@ if (update_sim) {
   set.seed(settings$seed)
   sim <- list(
     "alpha_0" = 0,
-    "t" = 12*68,      # Median amount of data
+    "t" = 12*70,      # Median amount of data
     "clusters" = 13,
     "fct_pr_cl" = 10,
-    "corr_within" = 0.55, 
-    "corr_across" = 0.03,
+    "corr_within" = 0.58, 
+    "corr_across" = 0.02,
     "n_sims" = 10000,
     "tau_c" = c(0.01, seq(from = 0.05, to = 0.5, by = 0.05)),
     "tau_w" = c(0.01, 0.2)
@@ -124,13 +124,14 @@ tpf_factors <- prepare_tpf_factors(region = settings$tpf_factors$region, orig_si
 opt_s <- tpf_factors$long %>% optimal_shrinkage(k = settings$tpf_factors$k)
 
 # Posterior Over time -----------------
+ot_region <- "world"
 if (update_post_over_time) {
   for (fix_taus in c(T,F)) {
     if (fix_taus) {
       fixed_priors <- list(
-        "alpha" = eb_est$us$mle %>% filter(estimate == "alpha") %>% pull(ml_est), 
-        "tau_c" = eb_est$us$mle %>% filter(estimate == "tau_c") %>% pull(ml_est), 
-        "tau_s" = eb_est$us$mle %>% filter(estimate == "tau_s") %>% pull(ml_est)
+        "alpha" = eb_est[[ot_region]]$mle %>% filter(estimate == "alpha") %>% pull(ml_est), 
+        "tau_c" = eb_est[[ot_region]]$mle %>% filter(estimate == "tau_c") %>% pull(ml_est), 
+        "tau_s" = eb_est[[ot_region]]$mle %>% filter(estimate == "tau_s") %>% pull(ml_est)
       )
     } else {
       fixed_priors <- NULL
@@ -140,7 +141,7 @@ if (update_post_over_time) {
     periods <- periods[month(periods) == 12]  # Only estimate once per year
     
     time_chars <- regional_pfs %>% 
-      filter(region == "us" & eom <= as.Date("1960-12-31")) %>% 
+      filter(region == ot_region & eom <= as.Date("1960-12-31")) %>% 
       group_by(characteristic) %>%
       filter(n() >= settings$eb$min_obs) %>%
       pull(characteristic) %>% 
@@ -152,7 +153,7 @@ if (update_post_over_time) {
       data <- regional_pfs %>% 
         filter(characteristic %in% time_chars) %>%
         filter(eom >= settings$start_date & eom <= end_date) %>%
-        filter(region == "us") %>% 
+        filter(region == ot_region) %>% 
         eb_prepare(
           scale_alpha = settings$eb$scale_alpha, 
           overlapping = settings$eb$overlapping 
@@ -250,18 +251,18 @@ if (update_post_is) {
 sig_oos_pfs <- posterior_is %>% trading_on_significance()
 
 # Harvey et al (2016) Simulation - Baseline ------------------------------
-# We use the baseline specification from table 5 - Panel A where the average correlation is 0
+# We use the baseline specification from table 5 - Panel A where the average correlation is 0 (the average correlation among factors in our data is 7%)
 # 1300 * (1-0.396)  The harvey et al numbers are m=1297 and m_true=783
 harvey_base <- list(
   alpha_0 = 0,
-  t = 68*12,  
+  t = 70*12,  
   ret = 4.4 / 12,
   vol = 10 / sqrt(12),
   cl = 26,
   cl_true = 16,
   fct_pr_cl = 50,
-  corr_across = 0,
-  corr_within = 0.5,
+  corr_across = 0.02,
+  corr_within = 0.58,
   tau_ws = c(0.21),         # We estimate it at 0.21
   n_sims = 50,
   fix_alpha = T
@@ -279,18 +280,18 @@ if (update_harvey_baseline) {
 }
 
 # Harvey et al (2016) Simulation - Worst Case
-# We use the worst cases specification from table 5 - Panel B where the average correlation is 0
+# We use the worst cases specification from table 5 - Panel B where the average correlation is 0 (the average correlation among factors in our data is 7%)
 # 2500 * (1-0.683) = 800  The harvey numbers are m=2458 and m_true=779
 harvey_worst <- list(
   alpha_0 = 0,
-  t = 68*12,  
+  t = 70*12,                # Median number of years for US factor
   ret = 4.4 / 12,
   vol = 10 / sqrt(12),
   cl = 50,
   cl_true = 16,
   fct_pr_cl = 50,
-  corr_across = 0,
-  corr_within = 0.5,
+  corr_across = 0.02,
+  corr_within = 0.58,
   tau_ws = c(0.21),         # We estimate it at 0.21 Same as what we estimate
   n_sims = 50,
   fix_alpha = T

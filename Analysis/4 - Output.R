@@ -1,7 +1,7 @@
 # Determine Cluster Order
 cluster_order <- c("Accruals", "Debt Issuance", "Investment", "Skewness", "Value",
                    "Low Risk", "Quality", "Momentum", "Profitability", "Profit Growth",
-                   "Seasonality", "Size", "Leverage")
+                   "Seasonality", "Size", "Low Leverage")
 
 # Collect all output in list
 output <- list(figures = list(), tables = list())
@@ -27,21 +27,19 @@ output$figures$hcl_us <- function(tex = F) {
                y_shift = 11/2, horiz = T)
   # Labels
   if (settings$hcl$k == 13) {
-    text(x = x, y = 147, label_func("Seasonality+"), cex = c, col = colours_theme[5], adj = 0)   #gold-9
-    text(x = x, y = 137, label_func("Accruals"), cex = c, col = colours_theme[4], adj = 0)  #lightgreen-7
-    text(x = x, y = 131, label_func("Debt Issuance"), cex = c, col = colours_theme[3], adj = 0)  #purple-5
-    text(x = x, y = 126, label_func("Size"), cex = c, col = colours_theme[2], adj = 0)       #orange-4
-    
-    text(x = x, y = 117, label_func("Leverage"), cex = c, col = colours_theme[1], adj = 0)           #darkgreen-3
-    text(x = x, y = 106, label_func("Profit Growth"), cex = c, col = colours_theme[11], adj = 0)            #orange-4 
-    text(x = x, y = 97, label_func("Momentum"), cex = c, col = colours_theme[9], adj = 0)       #red-2
-    text(x = x, y = 85, label_func("Quality"), cex = c, col = colours_theme[7], adj = 0)            #blue-1  
-    text(x = x, y = 73, label_func("Skewness"), cex = c, col = colours_theme[5], adj = 0)   #black-11
-    text(x = x, y = 63, label_func("Profitability"), cex = c, col = colours_theme[4], adj = 0)            #lightgreen-7
-    text(x = x, y = 48, label_func("Value"), cex = c, col = colours_theme[3], adj = 0)   #purple-5
-    
-    text(x = x, y = 31, label_func("Low Risk"), cex = c, col = colours_theme[2], adj = 0)               #darkgreen-3
-    text(x = x, y = 12, label_func("Investment"), cex = c, col = colours_theme[1], adj = 0)        #blue-1
+    text(x = x, y = 151, label_func("Skewness"), cex = c, col = colours_theme[5], adj = 0)   #gold-9
+    text(x = x, y = 141, label_func("Profitability"), cex = c, col = colours_theme[4], adj = 0)  #lightgreen-7
+    text(x = x, y = 129, label_func("Low Risk"), cex = c, col = colours_theme[3], adj = 0)  #purple-5
+    text(x = x, y = 112, label_func("Value"), cex = c, col = colours_theme[2], adj = 0)       #orange-4
+    text(x = x, y = 90, label_func("Investment"), cex = c, col = colours_theme[1], adj = 0)           #darkgreen-3
+    text(x = x, y = 73, label_func("Seasonality"), cex = c, col = colours_theme[11], adj = 0)            #orange-4 
+    text(x = x, y = 63, label_func("Debt Issuance"), cex = c, col = colours_theme[9], adj = 0)       #red-2
+    text(x = x, y = 57, label_func("Size"), cex = c, col = colours_theme[7], adj = 0)            #blue-1  
+    text(x = x, y = 51, label_func("Accruals"), cex = c, col = colours_theme[5], adj = 0)   #black-11
+    text(x = x, y = 43, label_func("Low Leverage"), cex = c, col = colours_theme[4], adj = 0)            #lightgreen-7
+    text(x = x, y = 30, label_func("Profit Growth"), cex = c, col = colours_theme[3], adj = 0)   #purple-5
+    text(x = x, y = 22, label_func("Momentum"), cex = c, col = colours_theme[2], adj = 0)               #darkgreen-3
+    text(x = x, y = 12, label_func("Quality"), cex = c, col = colours_theme[1], adj = 0)        #blue-1
   }
 }
 
@@ -127,9 +125,13 @@ output$figures$tpf_factors_imp_cluster <- tpf_factors$wide %>% plot_tpf_factor_i
 tpf_evol <- tpf_factors$long %>% plot_tpf_evolution(data_wide = tpf_factors$wide, char_info = char_info, orig_sig_values = settings$tpf_factors$orig_sig, s = opt_s)
 output$figures$tpf_evolution <- tpf_evol$plot
 
-# Cummulative returns OOS
-output$figures$ts_oos_all <- regional_pfs[region %in% c("us", "world_ex_us")] %>% plot_ts(type="all", oos=T, alphas=T, start = as.Date("1990-01-01"))
-output$figures$ts_oos_cluster <- regional_pfs[region %in% c("us", "world_ex_us")] %>% plot_ts(type="cluster", oos=T, alphas=T, start = as.Date("1990-01-01"))
+
+# Cumulative returns OOS - Marginally significant factors
+output$figures$marg_sig_oos <- sig_oos_pfs %>% plot_sig_oos(sig_type = "marg_sig", cutoff_2012 = T, first_date = as.Date("1990-01-01"), leg_pos = c(.85, .55)) # Also include table for caption
+
+# Cummulative returns OOS - EB significant factors
+output$figures$eb_sig_oos <- sig_oos_pfs %>% plot_sig_oos(sig_type = "eb_sig", cutoff_2012 = F, first_date = as.Date("1990-01-01"), leg_pos = c(.85, .40)) # Also include table for caption
+
 
 # Save Figures as Pictures -------------------------
 if (save_figures) {
@@ -399,29 +401,21 @@ if (save_figures) {
   )
   dev.off()
   # Evolution of TPF
-  output_fig(path=output_path, name = "tpf_evolution", format = format, width = w, height = h)
+  output_fig(path=output_path, name = "tpf_evolution", format = format, width = w, height = h*0.8)
   output$figures$tpf_evolution
   dev.off()
   
-  # Cumulative OOS Return - Aggregate
-  output_fig(path=output_path, name = "ts_oos_all", format = format, width = w, height = h)
-  output$figures$ts_oos_all
+  # Cumulative OOS Return - Marginally significant factors
+  output_fig(path=output_path, name = "marg_sig_oos", format = format, width = w, height = h*2/3)
+  output$figures$marg_sig_oos
   dev.off()
   
-  # Cumulative OOS Return - Clusters
-  output_fig(path=output_path, name = "ts_oos_clusters", format = format, width = w, height = h)
-  output$figures$ts_oos_cluster
+  # Cumulative OOS Return - EB significant factors
+  output_fig(path=output_path, name = "eb_sig_oos", format = format, width = w, height = h*2/3)
+  output$figures$eb_sig_oos
   dev.off()
   
   # TABLES -----------------
-  # Remember:
-  # Only copy from "& country ..." and down.
-  # In line 94: 
-  #  - Delete "94"
-  #  - Delete "NA"
-  #  - Add hline above and below total
-  #  - Make "All" in \textbf{}
-  country_info %>% table_country()
   # Estimated Taus
   table_taus()
   # Economic Benefit of more Power
@@ -430,6 +424,20 @@ if (save_figures) {
   table_factor_info()
   
   # Numbers mentioned in paper --------
+  # Bayesian Multiple Testing
+  bayes_sim <- 1000000
+  (fdr_196 <- fdr_fwer_rates(t_cutoff = 1.96, orig_sig = T, a_vec = eb_est$world$factor_mean, a_cov = eb_est$world$factor_cov, n_sim = bayes_sim, seed=settings$seed))
+  (fdr_278 <- fdr_fwer_rates(t_cutoff = 2.78, orig_sig = T, a_vec = eb_est$world$factor_mean, a_cov = eb_est$world$factor_cov, n_sim = bayes_sim, seed=settings$seed))
+  (true_factors_tbl <- true_factors(t_cutoff = 0, a_vec = eb_est$world$factor_mean, a_cov = eb_est$world$factor_cov, orig_sig = T, n_sim = bayes_sim, seed=settings$seed))
+  (rr_unc <- true_factors(t_cutoff = 1.96, a_vec = eb_est$world$factor_mean, a_cov = eb_est$world$factor_cov, orig_sig = T, n_sim = bayes_sim, seed=settings$seed))
+  
+  # Mentioned in introduction
+  paste0("Replication rate SE: ", round(rr_unc$sd*100, 2), "%")
+  paste0("Bayesian FDR: ", round(fdr_196$fdr_dist$mean*100, 2), "%, with 95% CI of [", round(fdr_196$fdr_dist$p025*100, 2), "%, ", round(fdr_196$fdr_dist$p975*100, 2), "%], SE: ", round(fdr_196$fdr_dist$sd*100, 2))
+  paste0("Bayesian FWER: ", round(fdr_196$fwer_dist$mean*100, 2), "%, with SE of ", round(fdr_196$fwer_dist$sd*100, 2), "%")
+  paste0("Expected fraction of true factors: ", round(true_factors_tbl$mean*100, 2), "%, with SE of ", round(true_factors_tbl$sd*100, 2), "%")
+  
+  
   # BY cutoff
   mt %>%
     filter(method == "BY" & region == "us") %>%
@@ -446,17 +454,18 @@ if (save_figures) {
     ) %>% 
     print()
   
-  # Sales growth factor
-  sale_gr_us <- eb_est$us$factors %>% 
-    filter(region == "us" & characteristic == "sale_gr1")
-  sale_gr_all <- eb_est$all$factors %>% 
-    filter(region == "us" & characteristic == "sale_gr1")
+  # Change in Book equity factor
+  be_gr_us <- eb_est$us$factors %>% 
+    filter(region == "us" & characteristic == "be_gr1a")
+  be_gr_all <- eb_est$all$factors %>% 
+    filter(region == "us" & characteristic == "be_gr1a")
   tibble(
-    characteristic = rep("sale_gr1",2), 
+    characteristic = rep("be_gr1a",2), 
     region = rep("US", 2), 
     data = c("US", "Global"), 
-    post_mean = c(sale_gr_us$post_mean, sale_gr_all$post_mean), 
-    post_vol = c(sale_gr_us$post_sd, sale_gr_all$post_sd)
+    post_mean = c(be_gr_us$post_mean, be_gr_all$post_mean), 
+    post_vol = c(be_gr_us$post_sd, be_gr_all$post_sd),
+    t = post_mean / post_vol
   ) %>% print()
   
   # IS / OOS 
@@ -475,20 +484,25 @@ if (save_figures) {
     bind_rows() %>%
     group_by(period) %>%
     summarise(
+      n = n(),
       is = mean(is > 0),
       oos = mean(oos > 0)
     ) %>% 
     print()
   
-  # Bayesian Multiple Testing - Originally significant factors
-  bayes_sim <- 1000000
-  (fdr_196 <- fdr_fwer_rates(t_cutoff = 1.96, orig_sig = T, a_vec = eb_est$world$factor_mean, a_cov = eb_est$world$factor_cov, n_sim = bayes_sim, seed=settings$seed))
-  (fdr_278 <- fdr_fwer_rates(t_cutoff = 2.78, orig_sig = T, a_vec = eb_est$world$factor_mean, a_cov = eb_est$world$factor_cov, n_sim = bayes_sim, seed=settings$seed))
-  (true_factors_tbl <- true_factors(t_cutoff = 0, a_vec = eb_est$world$factor_mean, a_cov = eb_est$world$factor_cov, orig_sig = T, n_sim = bayes_sim, seed=settings$seed))
-  (rr_unc <- true_factors(t_cutoff = 1.96, a_vec = eb_est$world$factor_mean, a_cov = eb_est$world$factor_cov, orig_sig = T, n_sim = bayes_sim, seed=settings$seed))
+  # Posterior over time width
+  posterior_over_time %>% plot_over_time(orig_sig = T, ols_incl = T, lb = 5)
   
-  # Nano Caps in the US
-  country_info[eom == as.Date("2019-12-31") & excntry == "USA", .(n, n_nano, nano_prop = n_nano / n)] %>% print()
+  # Bayesian Multiple Testing
+  fdr_196$fdr_dist
+  fdr_278$fwer_fdr # FWER at t>2.78
+  true_factors_tbl
+  
+  # Replication rates in different size groups
+  eb_us_size %>% plot_size_overall(flipped = T, text = T)
+  
+  # Publication Bias
+  plot_harvey(harvey_base_res = harvey_base_res, harvey_worst_res = harvey_worst_res, tau_ws = 0.21, act_rr = headline_rr)
   
   # Correlations across size and region
   eb_us_size %>%
@@ -513,6 +527,8 @@ if (save_figures) {
   
   # TPF Evolution numbers
   tpf_evol$data %>%
+    arrange(year) %>%
+    mutate(tpf_sr_l1 = dplyr::lag(tpf_sr)) %>%
     filter(year %in% c(min(year), max(year), 2002, 1991)) %>% # char_info[characteristic %in% c("seas_2_5an", "oaccruals_at")]
     arrange(year) %>%
     mutate(
@@ -520,8 +536,20 @@ if (save_figures) {
         year == 1971 ~ "Market",
         year == 1991 ~ "Accruals",
         year == 2002 ~ "Seasonality",
-        year == 2019 ~ "[All factors included]",
+        year == year(settings$end_date) ~ "[All factors included]",
       )
     ) %>%
     print()
+  
+  # Average pairwise correlations
+  eb_est$us$input$long %>%
+    select(characteristic, eom, ret_neu) %>%
+    spread(key = characteristic, value = ret_neu) %>%
+    select(-eom) %>%
+    cor(use = "pairwise.complete.obs") %>%
+    as_tibble(rownames = "char1") %>%
+    gather(-char1, key = "char2", value = "cor") %>% 
+    filter(char1 != char2) %>% 
+    summarise(average_cor = mean(cor))
+  
 }

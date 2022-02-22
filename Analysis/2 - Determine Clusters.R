@@ -66,7 +66,7 @@ if (settings$weighting$us == "vw_cap" & settings$hcl$k == 13 & settings$hcl$regi
   clusters$labels <- clusters$labels %>% 
     mutate(
       hcl_label = case_when(
-        hcl == 1 ~ "Leverage",  
+        hcl == 1 ~ "Low Leverage",  
         hcl == 2 ~ "Investment",     
         hcl == 3 ~ "Size", 
         hcl == 4 ~ "Value",  

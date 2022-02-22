@@ -1,6 +1,6 @@
 # Prepare Support Data ---------------------------------
 # Market Returns
-market_returns <- fread(paste0(portfolio_path, "/market_returns.csv"), colClasses = c("eom"="character"))
+market_returns <- fread(paste0(data_path, "/market_returns.csv"), colClasses = c("eom"="character"))
 market_returns[, eom := eom %>% as.Date(format = "%Y-%m-%d")]
 market_returns <- market_returns[, .(excntry, eom, mkt_vw_exc, stocks, me_lag1)]
 market_returns <- market_returns[
@@ -23,7 +23,7 @@ base_chars <- char_info$characteristic
 
 # Country Classification
 country_classification <- readxl::read_xlsx("Country Classification.xlsx", 
-                                            sheet = "countries", range = "A1:I200") %>%
+                                            sheet = "countries", range = "A1:C200") %>%
   select(excntry, msci_development, region) %>%
   filter(!is.na(excntry)) %>%
   setDT()
@@ -42,15 +42,9 @@ region_info <- tibble(
   countries_min = c(1, rep(settings$countries_min, 3), 1, 3)
 )
 
-
-# Summary Statistic (for Plotting)
-country_info <- fread("Country Stats.csv", colClasses = c("eom"="character"))
-country_info[, eom := eom %>% as.Date(format="%Y%m%d")]
-country_info <- country_classification[country_info, on = "excntry"]
-
 # Prepare Data --------------------------------------------------------
 # HML ----------------------
-hml <- fread(paste0(portfolio_path, "/hml.csv"), colClasses = c("eom"="character"))
+hml <- fread(paste0(data_path, "/hml.csv"), colClasses = c("eom"="character"))
 hml[, eom := eom %>% as.Date(format = "%Y-%m-%d")]
 # Choose weighting
 hml[excntry == "USA", ret := case_when(
@@ -121,7 +115,7 @@ regional_pfs <- 1:nrow(region_info) %>% lapply(function(i) {
 }) %>% bind_rows() 
 
 # Characteristic Managed Portfolios ----------------------
-cmp <- fread(paste0(portfolio_path, "/cmp.csv"), colClasses = c("eom"="character"))
+cmp <- fread(paste0(data_path, "/cmp.csv"), colClasses = c("eom"="character"))
 cmp[, eom := eom %>% as.Date(format="%Y-%m-%d")]
 
 # Screens

@@ -11,7 +11,7 @@ options(dplyr.summarise.inform = FALSE)
 
 # How To --------------------------------------
 # Paths
-# - portfolio_path:           Folder that contains market_returns.csv, hml.csv and cmp.csv generated from portfolio.R                
+# - data_path:                Folder that contains market_returns.csv, hml.csv and cmp.csv generated from portfolio.R                
 # - object_path:              Folder to save objects too. Retrived when update_*==F
 # - output_path:              Folder to save figures in. Not neccesary if save_figures==F
 # Save
@@ -25,7 +25,7 @@ options(dplyr.summarise.inform = FALSE)
 
 # User Input -----------------------
 # Paths
-portfolio_path <- "Factors" 
+data_path <- "Data" 
 object_path <- "Objects"
 output_path <- "Figures"
 # Save
@@ -40,7 +40,7 @@ update_harvey_worstcase <- T
 settings <- list(
   seed = 1,
   start_date = as.Date("1925-12-31"),     
-  end_date = as.Date("2019-12-31"),       # Important that end_date <= Last_CRSP_UPDATE
+  end_date = as.Date("2020-12-31"),       # Important that end_date <= Last_CRSP_UPDATE
   country_excl = c("ZWE", "VEN"),         # Countries are excluded due to data issues
   weighting =  list(                      # Which weighting scheme to use? In c("ew", "vw", "vw_cap")
     us = 'vw_cap',
@@ -102,8 +102,8 @@ scale_fill_discrete <- function(...) {
 }
 
 # Run Scripts ----------
-source("0 - Functions.R")
-source("1 - Prepare Data.R")
-source("2 - Determine Clusters.R")
-source("3 - Analysis.R")
-source("4 - Output.R")
+source("0 - Functions.R", echo = T)
+source("1 - Prepare Data.R", echo = T)
+source("2 - Determine Clusters.R", echo = T)
+source("3 - Analysis.R", echo = T)
+source("4 - Output.R", echo = T)

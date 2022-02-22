@@ -17,7 +17,7 @@ This repository contains code that is used for the paper [Is There a Replication
 2. If `save_figures=TRUE` (default), the folder in `output_path` will contain figures of the same format used in the paper. 
 
 ## Optional Settings 
-1. `portfolio_path` is the folder with the portfolio data from step 1 (default: current working directory/Factors).
+1. `data_path` is the folder with the portfolio data from step 1 (default: current working directory/Data).
 2. `object_path` is a folder where R objects can be saved for faster                iterations (default: current working directory/Objects).
 3. `output_path` is a folder where figures can be saved (default: current working directory/Figures).
 4. `save_figures` should be `TRUE` if you wish to save figures, otherwise `FALSE` (default: TRUE).

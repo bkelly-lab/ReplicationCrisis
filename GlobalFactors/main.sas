@@ -5,7 +5,7 @@ proc delete data = _all_ ; run ;
 * Manual Inputs
 *************************************************************************** ; 
 * Assign scratch and project folder names;
-%let scratch_folder = /scratch/cbs/tij; 
+%let scratch_folder = /scratch/INSTITUTION/FOLDER; 
 %let project_folder = ~/Global Data;
 * Set defaults;
 %let delete_temp = 1;  * Should temporary files be deleted?;
@@ -28,7 +28,6 @@ libname project "&project_folder.";
 %include "&project_folder./market_chars.sas";
 %include "&project_folder./accounting_chars.sas";
 %include "&project_folder./ind_identification.sas";
-
 
 *****************************************************************************
 * Create Return Data
@@ -90,14 +89,17 @@ proc delete data=world_msf2 world_msf3; run;
 * Create Characteristics Based on Accounting Data
 **************************************************************************** ;
 %standardized_accounting_data(coverage='world', convert_to_usd=1, me_data = scratch.world_msf, include_helpers_vars=1, start_date='31DEC1949'd); 
-%create_acc_chars(data=acc_std_ann, out=achars_world, lag_to_public=4, max_data_lag=18, __keep_vars=&char_vars., me_data=scratch.world_msf, suffix=);
-%create_acc_chars(data=acc_std_qtr, out=qchars_world, lag_to_public=4, max_data_lag=18, __keep_vars=&char_vars., me_data=scratch.world_msf, suffix=_qitem);
-%combine_ann_qtr_chars(out=scratch.acc_chars_world, ann_data=achars_world, qtr_data=qchars_world, __char_vars=&char_vars., q_suffix=_qitem);
+%create_acc_chars(data=acc_std_ann, out=achars_world, lag_to_public=4, max_data_lag=18, __keep_vars=&acc_chars., me_data=scratch.world_msf, suffix=);
+%create_acc_chars(data=acc_std_qtr, out=qchars_world, lag_to_public=4, max_data_lag=18, __keep_vars=&acc_chars., me_data=scratch.world_msf, suffix=_qitem);
+%combine_ann_qtr_chars(out=scratch.acc_chars_world, ann_data=achars_world, qtr_data=qchars_world, __char_vars=&acc_chars., q_suffix=_qitem);
 
 *****************************************************************************
 * Create Characteristics Based on Monthly Market Data
 **************************************************************************** ;
 %market_chars_monthly(out=scratch.market_chars_m, data=scratch.world_msf, market_ret = scratch.market_returns, local_currency=0); 
+
+* Free up space;
+proc datasets library=work kill nolist; quit;
 
 *****************************************************************************
 * Combine Returns, Accounting and Monthly Market Data
@@ -114,6 +116,12 @@ proc sql;
 	alter table scratch.world_data_prelim 
 	drop div_tot, div_cash, div_spc, public_date, source; 
 quit;
+
+%if &delete_temp.=1 %then %do;
+	proc delete data=
+		scratch.market_chars_m scratch.acc_chars_world; 
+	run;
+%end;
 
 *****************************************************************************
 * Asset Pricing Factors

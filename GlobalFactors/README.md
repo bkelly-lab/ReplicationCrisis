@@ -68,4 +68,4 @@ The file `portfolio.R` generates country level factor returns based on the datas
 - `mkt_ew`: Equally weighted market return in USD.
 - `mkt_ew_exc`: Equally weighted market excess return in USD.
 - `mkt_vw_exc` (market_return.csv): Value weighted market excess return in USD.
-- `mkt_vw_exc` (Regional Factors): Market cap weighted sum of the market excess return in USD for included in a regional portfolio at a specific point in time.
+- `mkt_vw_exc` (Regional Factors): Market cap weighted average of the market excess return in USD for countries included in the regional portfolio.

@@ -1,9 +1,9 @@
-characteristic,cluster
-age,Leverage
+characteristic,hcl_label
+age,Low Leverage
 aliq_at,Investment
-aliq_mat,Leverage
+aliq_mat,Low Leverage
 ami_126d,Size
-at_be,Leverage
+at_be,Low Leverage
 at_gr1,Investment
 at_me,Value
 at_turnover,Quality
@@ -14,12 +14,12 @@ beta_dimson_21d,Low Risk
 betabab_1260d,Low Risk
 betadown_252d,Low Risk
 bev_mev,Value
-bidaskhl_21d,Leverage
+bidaskhl_21d,Low Leverage
 capex_abn,Debt Issuance
 capx_gr1,Investment
 capx_gr2,Investment
 capx_gr3,Investment
-cash_at,Leverage
+cash_at,Low Leverage
 chcsho_12m,Value
 coa_gr1a,Investment
 col_gr1a,Investment
@@ -53,12 +53,12 @@ fcf_me,Value
 fnl_gr1a,Debt Issuance
 gp_at,Quality
 gp_atl1,Quality
-intrinsic_value,Profitability
 inv_gr1,Investment
 inv_gr1a,Investment
 iskew_capm_21d,Skewness
 iskew_ff3_21d,Skewness
 iskew_hxz4_21d,Skewness
+ival_me,Value
 ivol_capm_21d,Low Risk
 ivol_capm_252d,Low Risk
 ivol_ff3_21d,Low Risk
@@ -71,13 +71,13 @@ mispricing_mgmt,Investment
 mispricing_perf,Quality
 ncoa_gr1a,Investment
 ncol_gr1a,Debt Issuance
-netdebt_me,Leverage
+netdebt_me,Low Leverage
 netis_at,Value
 nfna_gr1a,Debt Issuance
-ni_ar1,Seasonality
+ni_ar1,Debt Issuance
 ni_be,Profitability
 ni_inc8q,Quality
-ni_ivol,Leverage
+ni_ivol,Low Leverage
 ni_me,Value
 niq_at,Quality
 niq_at_chg1,Profit Growth
@@ -93,7 +93,7 @@ oaccruals_ni,Accruals
 ocf_at,Profitability
 ocf_at_chg1,Profit Growth
 ocf_me,Value
-ocfq_saleq_std,Value
+ocfq_saleq_std,Low Risk
 op_at,Quality
 op_atl1,Quality
 ope_be,Profitability
@@ -108,8 +108,8 @@ qmj_growth,Quality
 qmj_prof,Quality
 qmj_safety,Quality
 rd_me,Size
-rd_sale,Leverage
-rd5_at,Leverage
+rd_sale,Low Leverage
+rd5_at,Low Leverage
 resff3_12_1,Momentum
 resff3_6_1,Momentum
 ret_1_0,Skewness
@@ -136,19 +136,19 @@ seas_1_1na,Momentum
 seas_11_15an,Seasonality
 seas_11_15na,Seasonality
 seas_16_20an,Seasonality
-seas_16_20na,Seasonality
+seas_16_20na,Accruals
 seas_2_5an,Seasonality
 seas_2_5na,Investment
 seas_6_10an,Seasonality
-seas_6_10na,Value
+seas_6_10na,Low Risk
 sti_gr1a,Seasonality
 taccruals_at,Accruals
 taccruals_ni,Accruals
-tangibility,Leverage
+tangibility,Low Leverage
 tax_gr1a,Profit Growth
 turnover_126d,Low Risk
 turnover_var_126d,Profitability
-z_score,Leverage
+z_score,Low Leverage
 zero_trades_126d,Low Risk
 zero_trades_21d,Low Risk
 zero_trades_252d,Low Risk

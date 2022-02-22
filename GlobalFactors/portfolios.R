@@ -36,7 +36,7 @@ chars <- c(
   "ebit_bev",            "ebit_sale",           "ebitda_mev",          "emp_gr1",            
   "eq_dur",              "eqnetis_at",          "eqnpo_12m",           "eqnpo_me",           
   "eqpo_me",             "f_score",             "fcf_me",              "fnl_gr1a",           
-  "gp_at",               "gp_atl1",             "intrinsic_value",     "inv_gr1",            
+  "gp_at",               "gp_atl1",             "ival_me",             "inv_gr1",            
   "inv_gr1a",            "iskew_capm_21d",      "iskew_ff3_21d",       "iskew_hxz4_21d",     
   "ivol_capm_21d",       "ivol_capm_252d",      "ivol_ff3_21d",        "ivol_hxz4_21d",      
   "kz_index",            "lnoa_gr1a",           "lti_gr1a",            "market_equity",      
@@ -535,7 +535,7 @@ if(!is.null(legacy_path)) {
   if (settings$ind_pf) {
     gics_returns[eom <= settings$end_date] %>% fwrite(file = paste0(folder, "/industry_gics.csv"))
     if (nrow(ff49_returns) != 0) {
-      ff49_returns[eom <= settings$end_date] %?% fwrite(file = paste0(folder, "/industry_ff49.csv"))
+      ff49_returns[eom <= settings$end_date] %>% fwrite(file = paste0(folder, "/industry_ff49.csv"))
     }
   }
 }
@@ -556,7 +556,7 @@ if (settings$daily_pf) {
 if (settings$ind_pf) {
   gics_returns[eom <= settings$end_date] %>% fwrite(file = paste0(output_path, "/industry_gics.csv"))
   if (nrow(ff49_returns) != 0) {
-    ff49_returns[eom <= settings$end_date] %?% fwrite(file = paste0(output_path, "/industry_ff49.csv"))
+    ff49_returns[eom <= settings$end_date] %>% fwrite(file = paste0(output_path, "/industry_ff49.csv"))
   }
 }
 

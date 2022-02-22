@@ -565,65 +565,6 @@ multiple_testing <- function(eb_all, eb_world = NULL) {
     ) 
 }
 
-# Global Factor -------
-global_factor_posterior <- function(eb_all, weights) {  # weights in c("ew", "vw_late")
-  a <- eb_all$factor_mean 
-  a_cov <- eb_all$factor_cov
-  char_regs <- rownames(a)
-  chars <- char_regs %>% str_extract(".+?(?=__)")
-  regions <- char_regs %>% str_extract("(?<=__).+")
-  
-  # Market Caps
-  region_weight <- market_returns %>%
-    left_join(country_info %>% select(excntry, msci_development), by = "excntry") %>%
-    mutate(
-      region = case_when(
-        excntry == "USA" ~ "us",
-        msci_development == "developed" ~ "developed",
-        msci_development == "emerging" ~ "emerging"
-      )
-    ) %>%
-    filter(!is.na(region)) %>%
-    group_by(region, eom) %>%
-    summarise(
-      me = sum(me_lag1)
-    ) %>% 
-    filter(eom == as.Date("2019-12-31"))
-  
-  region_me <- case_when(
-    regions == "us" ~ region_weight %>% filter(region == "us") %>% pull(me),
-    regions == "developed" ~ region_weight %>% filter(region == "developed") %>% pull(me),
-    regions == "emerging" ~ region_weight %>% filter(region == "emerging") %>% pull(me),
-  )
-  
-  global_factors <- unique(chars) %>% lapply(function(x) {
-    pos_vec <- as.numeric(chars == x) 
-    if (weights == "ew") {
-      pf_vec <- pos_vec
-    }
-    if (weights == "vw_late") {
-      pf_vec <- pos_vec * region_me
-    }
-    pf_vec <- pf_vec / sum(pf_vec)
-    
-    tibble(
-      "characteristic" = x,
-      "n" = sum(pos_vec),
-      "post_mean" = drop(t(a) %*% pf_vec),
-      "post_sd" = drop(sqrt(t(pf_vec) %*% a_cov %*% pf_vec))
-    )
-  }) %>%
-    bind_rows() %>%
-    left_join(cluster_labels, by = "characteristic")
-  rep_rate <- global_factors %>% 
-    left_join(char_info %>% select(characteristic, "orig_sig" = significance), by = "characteristic") %>% 
-    filter(orig_sig == T) %>%
-    summarise(repl_rate = mean(post_mean - 1.96 * post_sd > 0)) 
-  rep_rate %>% print()
-  
-  list(global_factors, unlist(rep_rate))
-}
-
 # Bootstrap Tangency Portfolio --
 # BS Func
 bootstrap_tpf <- function(data, n_boots = 100, shorting = T, seed = 1) {
@@ -755,7 +696,7 @@ trading_on_significance <- function(posterior_is) {
     filter(significance == 1 & est_date >= sample_end) %>%
     group_by(est_date) %>%
     mutate(
-      ols_p = 1 - pnorm(abs(ols_est / ols_se)),
+      ols_p = pnorm(abs(ols_est / ols_se), lower.tail = F)*2,
       by_p = p.adjust(ols_p, method = "BY")
     ) 
   
@@ -1051,62 +992,6 @@ optimal_shrinkage <- function(data, k, epo_range = seq(0, 1, 0.1)) {
 
 
 # Table Functions --------------------------------------------------------
-table_country <- function(country_stats) {
-  tbl_caption <- paste("The table shows summary statistics by the country where a security is listed.\\", 
-                       "We only include countries with data available by December 31st 2019.\\",
-                       "We include common stocks that are the primary security of the underlying firm, with non-missing return and lagged market equity data.\\",
-                       "\\textit{Country} is the ISO code of the underlying exchange country.\\", 
-                       "For further information, see \\href{https://en.wikipedia.org/wiki/List_of_ISO_3166_country_codes}{https://en.wikipedia.org/wiki/List\\_of\\_ISO\\_3166\\_country\\_codes.}",
-                       "\\textit{MSCI} shows the MSCI classification of each country as of January 7th 2021.", 
-                       "For the most recent classification, see \\href{https://www.msci.com/market-classification}{https://www.msci.com/market-classification}.",
-                       "\\textit{Start} is the first date with a valid observation.",
-                       "In the next 4 columns, the data is shown as of December 31st 2019.\\",
-                       "\\textit{Stocks} is the number of stocks available.\\", 
-                       "\\textit{Mega stocks} is the number of stocks with a market cap above the 80th percentile of NYSE stocks.\\",
-                       "\\textit{Total Market Cap} is the aggregate market cap in million USD.\\",
-                       "\\textit{Median MC} is the median market cap in million USD.")
-  
-  op <- country_stats %>%
-    mutate(n_big = n_mega + n_large) %>%
-    group_by(excntry) %>%
-    mutate(start_date = min(eom)) %>%
-    filter(eom == as.Date("2019-12-31")) %>%
-    arrange(-me) %>%
-    select(excntry, msci_development, start_date, n, n_accounting, n_mega, me, me_p50)
-  
-  total <- op %>%
-    ungroup() %>%
-    summarise(
-      excntry = "All",
-      msci_development = "",
-      start_date = NA_Date_,
-      n = sum(n),
-      n_accounting = sum(n_accounting),
-      n_mega = sum(n_mega),
-      me = sum(me),
-      me_p50 = NA_real_
-    )
-  
-  op %>%
-    bind_rows(total) %>%
-    mutate(
-      n = n %>% prettyNum(big.mark = ",", digits = 0),
-      n_mega = n_mega %>% prettyNum(big.mark=",", digits = 0),
-      start_date = as.character(start_date),
-      me = me %>% formatC(format = "e", digits = 2),
-      me_p50 = me_p50 %>% prettyNum(big.mark=",", digits = 0),
-      msci_development = msci_development %>% str_to_title(),
-      " "= ' ',
-    ) %>%
-    select(-n_accounting) %>%
-    select(excntry, msci_development, start_date, ` `, everything()) %>%
-    rename("Country" = excntry, "MSCI" = msci_development, "Start" = start_date, "Stocks" = n, "Mega Stocks" = n_mega,
-           "Total Market Cap" = me, "Median MC" = me_p50) %>%
-    xtable(digits = 0, align = "lllllrrrr", caption = tbl_caption) %>%
-    print(include.rownames = T, floating = FALSE, latex.environments = "center", hline.after=c(-1, 0), 
-          tabular.environment = "longtable", size="\\fontsize{10pt}{12pt}\\selectfont")
-}
-
 table_is_oos_ols <- function(is_oos_regs, is_post_regs) {
   oos_us <- lm(oos ~ is, data = is_oos_regs %>% filter(region == "us"))
   post_us <- lm(post ~ is, data = is_post_regs %>% filter(region == "us"))
@@ -1224,7 +1109,7 @@ table_taus <- function(){
   
   taus %>%
     select("Sample" = sample, "$\\tau_c$" = tau_c, "$\\tau_w$" = tau_s, "$\\tau_s$" = tau_w) %>% # Here I use the notation from eq 23
-    xtable(auto=T, digits = 3, caption = tau_cap) %>% 
+    xtable(auto=T, digits = 2, caption = tau_cap) %>% 
     print(include.rownames = F, caption.placement = "top", sanitize.colnames.function = identity) 
 }
 
@@ -1889,7 +1774,7 @@ plot_tpf <- function(tpf, cluster_order, ci_low = 0.05, ci_high = 0.95) {
     ) %>%
     left_join(orig, by = "term") %>%
     mutate(bs_bias = bs_mean - tpf_weight)
-  
+  print(paste0("Clusters with significantly positive TPF weight: ", sum(filter(bs, term != "Market")$bs_low>0)))
   bs %>% 
     mutate(
       term = term %>% factor(levels = c(cluster_order, "Market"))
@@ -2005,10 +1890,10 @@ plot_over_time <- function(posterior_over_time, orig_sig, ols_incl, lb) {
   }
   
   all_factors <- tibble("char_reg" = rownames(posterior_over_time[[1]]$factor_mean)) %>%
-    mutate(characteristic = char_reg %>% str_remove("__us")) %>%
+    mutate(characteristic = char_reg %>% str_remove(paste0("__", ot_region))) %>%
     left_join(char_info %>% select(characteristic, "orig_sig" = significance), by = "characteristic") %>%
     mutate(
-      selected_factors = orig_sig %in% orig_sig_values
+      selected_factors = (orig_sig %in% orig_sig_values) 
     )
   i <- all_factors$selected_factors
   
@@ -2020,15 +1905,13 @@ plot_over_time <- function(posterior_over_time, orig_sig, ols_incl, lb) {
     post_mean <- drop(t(a) %*% w)
     post_sd <- drop(sqrt(t(w) %*% a_cov %*% w))
     avg_ols <- mean(eb_act$factors$ols_est[i])
-    tibble("end_date"= eb_act$end_date, post_mean, post_sd, avg_ols) 
+    tibble("end_date"= eb_act$end_date, n=n, post_mean, post_sd, avg_ols) 
   }) %>% bind_rows()
-  
-  y_max <- max(full_posterior$post_mean + 1.96*full_posterior$post_sd) 
   
   if (ols_incl) {
     # Create OLS benchmarks
-    ols_bm <- seq.Date(from = as.Date("1959-12-31"), to = as.Date("2019-12-31"), by = "1 year") %>% lapply(function(end_date) {
-      data <- regional_pfs[region == "us"] %>% 
+    ols_bm <- seq.Date(from = as.Date("1959-12-31"), to = settings$end_date, by = "1 year") %>% lapply(function(end_date) {
+      data <- regional_pfs[region == ot_region] %>% 
         filter(characteristic %in% all_factors$characteristic[i]) %>%
         filter(eom >= settings$start_date & eom <= end_date) %>%
         eb_prepare(
@@ -2056,7 +1939,6 @@ plot_over_time <- function(posterior_over_time, orig_sig, ols_incl, lb) {
           ret_neu_st = (ret - cov(ret, mkt_vw_exc)/var(mkt_vw_exc) * mkt_vw_exc)*100,
           ret_neu_st = ret_neu_st / sd(ret_neu_st) * (10 / sqrt(12))
         ) %>%
-        filter(!(characteristic == "zero_trades_126d" & end_date == as.Date("2007-12-31") & lb == 1)) %>% # In this period zero_trades_126d only has one observation
         summarise(alpha = mean(ret_neu_st)) %>%
         ungroup() %>%
         summarise(
@@ -2075,7 +1957,6 @@ plot_over_time <- function(posterior_over_time, orig_sig, ols_incl, lb) {
         ungroup() %>%
         mutate(
           ret_neu = ret - cov(ret, mkt_vw_exc) / var(mkt_vw_exc) * mkt_vw_exc
-          # ret_neu_scaled = ret_neu / sd(ret_neu) * (10/sqrt(12))
         ) %>%
         summarise(
           end_date = end_date,
@@ -2092,18 +1973,13 @@ plot_over_time <- function(posterior_over_time, orig_sig, ols_incl, lb) {
         left_join(ols_bm_wide, by = "end_date") %>%
         ggplot(aes(end_date)) +
         geom_point(aes(y = post_mean, colour="Average Posterior Alpha", shape = "Average Posterior Alpha")) +
-        # geom_line(aes(y = avg_alpha_full), colour = colours_theme[2], linetype = "solid") +
         geom_point(aes(y = avg_alpha_full, colour="Average OLS Alpha", shape = "Average OLS Alpha")) +
-        # geom_line(aes(y = alpha_avg_full), colour = colours_theme[3]) +
-        # geom_line(aes(y = avg_alpha_st), colour = colours_theme[4]) +
-        # geom_point(aes(y = avg_ols), colour = colours_theme[1], shape = 4) +
         geom_errorbar(aes(ymin = post_mean + 1.96 * post_sd, ymax = post_mean - 1.96 * post_sd)) +
         scale_colour_manual(name = "Test", values = c("Average Posterior Alpha"=colours_theme[1], "Average OLS Alpha"=colours_theme[2])) +
         scale_shape_manual(name = "Test", values = c("Average Posterior Alpha" = 16, "Average OLS Alpha" = 17)) +
-        # geom_hline(yintercept = 0) +
         labs(y = "Posterior Alpha with 95% CI (%)") +
-        ylim(c(0, y_max)) +
-        scale_x_date(breaks = seq.Date(as.Date("1959-12-31"), as.Date("2019-12-31"), by = "10 years"), date_labels = "%Y-%m") +
+        ylim(c(0, NA)) +
+        scale_x_date(breaks = seq.Date(as.Date("1960-12-31"), as.Date("2020-12-31"), by = "10 years"), date_labels = "%Y-%m") +
         theme(
           legend.title = element_blank(),
           legend.position = "top",
@@ -2115,15 +1991,13 @@ plot_over_time <- function(posterior_over_time, orig_sig, ols_incl, lb) {
       left_join(ols_bm_wide, by = "end_date") %>%
       ggplot(aes(end_date, avg_alpha_st)) +
       geom_col() +
-      # geom_line() +
-      # ylim(c(0,1)) +
       labs(y = "5-year Rolling Alpha (%)") +
-      scale_x_date(breaks = seq.Date(as.Date("1959-12-31"), as.Date("2019-12-31"), by = "10 years"), date_labels = "%Y-%m") +
+      scale_x_date(breaks = seq.Date(as.Date("1960-12-31"), as.Date("2020-12-31"), by = "10 years"), date_labels = "%Y-%m") +
       theme(
         axis.title.x = element_blank()
       )
     
-    print(full_posterior %>% left_join(ols_bm_wide, by = "end_date") %>% mutate(diff_pm = post_mean - lag(post_mean), diff_aaf = avg_alpha_full - lag(avg_alpha_full)) %>% filter(end_date != as.Date("1960-12-31")) %>% summarise(sd_pm = sd(diff_pm), sd_aaf = sd(diff_aaf)))
+    # print(full_posterior %>% left_join(ols_bm_wide, by = "end_date") %>% mutate(diff_pm = post_mean - lag(post_mean), diff_aaf = avg_alpha_full - lag(avg_alpha_full)) %>% filter(end_date != as.Date("1960-12-31")) %>% summarise(sd_pm = sd(diff_pm), sd_aaf = sd(diff_aaf)))
     
     plot <- cowplot::plot_grid(plot_1, plot_2, ncol = 1, rel_heights = c(2, 1))
   } else {
@@ -2132,15 +2006,15 @@ plot_over_time <- function(posterior_over_time, orig_sig, ols_incl, lb) {
       geom_point(aes(y = post_mean), colour=colours_theme[1], shape = 16) +
       geom_errorbar(aes(ymin = post_mean + 1.96 * post_sd, ymax = post_mean - 1.96 * post_sd)) +
       labs(y = "Posterior Alpha with 95% CI (%)") +
-      ylim(c(0, y_max)) +
-      scale_x_date(breaks = seq.Date(as.Date("1959-12-31"), as.Date("2019-12-31"), by = "10 years"), date_labels = "%Y-%m") +
+      ylim(c(0, NA)) +
+      scale_x_date(breaks = seq.Date(as.Date("1960-12-31"), as.Date("2020-12-31"), by = "10 years"), date_labels = "%Y-%m") +
       theme(
         legend.title = element_blank(),
         legend.position = "top",
-        axis.text.x = element_blank(),
         axis.title.x = element_blank()
       )
   }
+  print(full_posterior %>% mutate(ci_width = post_sd*1.96*2) %>% filter(end_date %in% c(as.Date("1960-12-31"), settings$end_date)))
   plot
 }
 
@@ -2160,7 +2034,7 @@ plot_taus_over_time <- function(posterior_over_time_flex) {
     ggplot(aes(end_date, ml_est, colour = estimate_pretty)) +
     geom_line() +
     scale_colour_manual(values = c('tau_c' = colours_theme[1], 'tau_w' = colours_theme[2]), name = '', labels = c(expression(tau[c]), expression(tau[w]))) +
-    scale_x_date(breaks = seq.Date(as.Date("1959-12-31"), as.Date("2019-12-31"), by = "10 years"), date_labels = "%Y-%m") +
+    scale_x_date(breaks = seq.Date(as.Date("1960-12-31"), as.Date("2020-12-31"), by = "10 years"), date_labels = "%Y-%m") +
     labs(y = "Maximum Likelihood Estimate (%)") +
     ylim(c(0, ymax)) +
     theme(
@@ -2168,58 +2042,6 @@ plot_taus_over_time <- function(posterior_over_time_flex) {
       legend.position = "top",
       axis.title.x = element_blank()
     )
-}
-
-plot_over_time_cluster <- function(posterior_over_time, cluster, orig_sig) {
-  if (orig_sig) {
-    orig_sig_values <- T
-  } else {
-    orig_sig_values <- c(T, F)
-  }
-  
-  all_factors <- tibble("char_reg" = rownames(posterior_over_time[[1]]$factor_mean)) %>%
-    mutate(characteristic = char_reg %>% str_remove("__us")) %>%
-    left_join(cluster_labels, by = "characteristic") %>%
-    left_join(char_info %>% select(characteristic, "orig_sig" = significance), by = "characteristic") %>%
-    mutate(
-      selected_factors = (orig_sig %in% orig_sig_values & hcl_label == cluster)
-    )
-  i <- all_factors$selected_factors
-  
-  full_posterior <- posterior_over_time %>% lapply(function(eb_act) {
-    a <- eb_act$factor_mean[i]
-    a_cov <- eb_act$factor_cov[i, i]
-    n <- length(a)
-    w <- rep(1/n, n)
-    post_mean <- drop(t(a) %*% w)
-    post_sd <- drop(sqrt(t(w) %*% a_cov %*% w))
-    avg_ols <- mean(eb_act$factors$ols_est[i])
-    tibble("end_date"= eb_act$end_date, post_mean, post_sd, avg_ols) 
-  }) %>% bind_rows()
-  
-  eb_act$factors %>%
-    filter(hcl_label == "Value") %>%
-    mutate(n = round(((10/sqrt(12)) / ols_se)^2)) %>% 
-    ggplot(aes(ols_est, post_mean, colour = ols_se)) + 
-    geom_point() + 
-    ylim(c(-0.2, 1)) + 
-    xlim(c(-0.2, 1)) + 
-    geom_abline(intercept = 0, slope = 1) + 
-    geom_text(aes(label = round(n)), nudge_y = -0.1)
-  
-  y_max <- max(full_posterior$post_mean + 1.96*full_posterior$post_sd) 
-  
-  full_posterior %>%
-    ggplot(aes(end_date, post_mean)) +
-    geom_point(colour = colours_theme[1]) +
-    geom_line(aes(y = avg_ols), colour = colours_theme[2]) +
-    # geom_point(aes(y = avg_ols), colour = colours_theme[1], shape = 4) +
-    geom_errorbar(aes(ymin = post_mean + 1.96 * post_sd, ymax = post_mean - 1.96 * post_sd)) +
-    labs(y = "Average Monthly Alpha with 95% CI (%)") +
-    # ylim(c(0, y_max)) +
-    theme(
-      axis.title.x = element_blank()
-    ) + labs(title = "Value Cluster")
 }
 
 plot_sim_fdr <- function(simulation) {
@@ -2876,13 +2698,10 @@ plot_harvey <- function(harvey_base_res, harvey_worst_res, tau_ws, act_rr) {
       type = type %>% factor(levels = c("Estimated from Data", "Harvey et al. (2016) : Baseline", "Harvey et al. (2016): Conservative", " "))
     ) %>%
     ggplot(aes(tau_c, repl_rate * 100)) +
-    # geom_point() +
     geom_point(data = tau_points, aes(colour = type, shape = type, stroke = 1), size = 3) +
     geom_line(alpha = 1, size = 0.6) +
     geom_hline(yintercept = act_rr*100, linetype = "dotted") +
-    # geom_col() +
     scale_x_continuous(breaks = seq(0.05, max(search_grid$tau_c), 0.05)) +
-    # facet_wrap(~tau_w_title, labeller = label_parsed) +
     ylim(c(0, 100)) +
     theme(legend.title = element_blank(), legend.position = "top") +
     labs(y = "Replication Rate (%)", x = bquote(bold(tau[c])~"(%)"), colour = expression(tau[c]), shape = expression(tau[c]))
@@ -3082,20 +2901,20 @@ plot_tpf_evolution <- function(data, data_wide, char_info, orig_sig_values, s) {
                y = 0.34, label = "Beta", colour='black') +
       geom_segment(aes(x = 1972, y = 0.31, xend = 1972, yend = 0.23), size=0.1,arrow = arrow(length = unit(0.2, "cm"))) +
       annotate("text", x = 1979, 
-               y = 0.5, label = "Earning-to-Price", colour='black') +
-      geom_segment(aes(x = 1979, y = 0.47, xend = 1979, yend = 0.35), size=0.1,arrow = arrow(length = unit(0.2, "cm"))) +
+               y = 0.45, label = "Earning-to-Price", colour='black') +
+      geom_segment(aes(x = 1979, y = 0.42, xend = 1979, yend = 0.30), size=0.1,arrow = arrow(length = unit(0.2, "cm"))) +
       annotate("text", x = 1983, 
-               y = 0.15, label = "Earnings Momentum", colour='black') +
-      geom_segment(aes(x = 1981, y = 0.17, xend = 1981, yend = 0.32), size=0.1,arrow = arrow(length = unit(0.2, "cm"))) +
+               y = 0.08, label = "Earnings Momentum", colour='black') +
+      geom_segment(aes(x = 1981, y = 0.10, xend = 1981, yend = 0.25), size=0.1,arrow = arrow(length = unit(0.2, "cm"))) +
       annotate("text", x = 1989, 
-               y = 0.32, label = "Price Momentum", colour='black') +
-      geom_segment(aes(x = 1989, y = 0.34, xend = 1989, yend = 0.46), size=0.1,arrow = arrow(length = unit(0.2, "cm"))) +
+               y = 0.25, label = "Price Momentum", colour='black') +
+      geom_segment(aes(x = 1989, y = 0.27, xend = 1989, yend = 0.39), size=0.1,arrow = arrow(length = unit(0.2, "cm"))) +
       annotate("text", x = 1991, 
-               y = 0.81, label = "Operating Accruals", colour='black') +
-      geom_segment(aes(x = 1991, y = 0.78, xend = 1991, yend = 0.69), size=0.1,arrow = arrow(length = unit(0.2, "cm"))) +
+               y = 0.73, label = "Operating Accruals", colour='black') +
+      geom_segment(aes(x = 1991, y = 0.69, xend = 1991, yend = 0.6), size=0.1,arrow = arrow(length = unit(0.2, "cm"))) +
       annotate("text", x = 2002, 
-               y = 1.0, label = "Seasonality", colour='black') +
-      geom_segment(aes(x = 2002, y = 0.97, xend = 2002, yend = 0.88), size=0.1,arrow = arrow(length = unit(0.2, "cm"))))
+               y = 0.9, label = "Seasonality", colour='black') +
+      geom_segment(aes(x = 2002, y = 0.87, xend = 2002, yend = 0.78), size=0.1,arrow = arrow(length = unit(0.2, "cm"))))
   
   n_plot <- sr_over_time %>%
     ggplot(aes(year, n)) +
@@ -3107,7 +2926,7 @@ plot_tpf_evolution <- function(data, data_wide, char_info, orig_sig_values, s) {
 }
 
 # Plot performance over time
-plot_ts <- function(data, type, oos=F, alphas=F, start = as.Date("1986-01-01")) {
+plot_ts <- function(data, oos, alphas, scale, orig_sig, start = as.Date("1986-01-01")) {
   data[, region := case_when(
     region == "us" ~ "US",
     region == "world_ex_us" ~ "World ex. US"
@@ -3118,60 +2937,159 @@ plot_ts <- function(data, type, oos=F, alphas=F, start = as.Date("1986-01-01")) 
     data <- setDT(char_info)[, .(characteristic, sample_end)][data, on = .(characteristic)]
     data <- data[year(eom) > sample_end][, sample_end := NULL]
   }
-  if (alphas) {
-    data[, ret := ret - cov(ret,mkt_vw_exc)/var(mkt_vw_exc)*mkt_vw_exc, by = .(region, characteristic)]
+  if (orig_sig) {
+    data <- setDT(char_info)[, .(characteristic, significance)][data, on = .(characteristic)]
+    data <- data[significance==T][, significance := NULL]
   }
   y_axis <- paste0("Cumulative ", if_else(alphas==T, "Alpha ", "Excess Return "), if_else(oos==T, "(OOS)", "(IS)"))
-  if (type == "all") {
-    agg <- data[, .(ret = mean(ret)), by = .(region, eom)]
+  
+  agg <- data[, .(ret = mean(ret), mkt = mean(mkt_vw_exc)), by = .(region, eom)]
+  if (alphas) {
+    agg[, ret := ret - cov(ret,mkt)/var(mkt)*mkt, by = .(region)]
+  }
+  if (scale) {
     agg[, ret := ret / (sd(ret)*sqrt(12)/0.1), by = .(region)]
-    agg %>% setorder(region, eom)
-    agg[, cumret_app := cumsum(ret), by = region]
-    plot <- agg %>%
-      ggplot(aes(eom, cumret_app, colour = region)) +
-      geom_line() +
-      labs(y = y_axis) +
-      theme(
-        legend.position = "top",
-        legend.title = element_blank(),
-        axis.title.x = element_blank()
-      )
   }
-  if (type == "cluster") {
-    agg <- data[, .(ret = mean(ret)), by = .(region, hcl_label, eom)]
-    agg[, ret := ret / (sd(ret)*sqrt(12)/0.1), by = .(region, hcl_label)]
-    agg %>% setorder(region, hcl_label, eom)
-    agg[, cumret_app := cumsum(ret), by = .(region, hcl_label)]
-    plot <- agg %>%
-      ggplot(aes(eom, cumret_app, colour = region)) +
-      geom_line() +
-      facet_wrap(~hcl_label)  +
-      labs(y = y_axis) +
-      theme(
-        legend.position = "top",
-        legend.title = element_blank(),
-        axis.title.x = element_blank()
-      )
-  }
-  if (type == "rep") {
-    agg <- data[characteristic %in% c("oaccruals_at", "debt_gr3", "at_gr1", "at_be", "beta_60m", "ret_12_1", "niq_su", "ni_be", "qmj", "seas_2_5an", "market_equity", "rskew_21d", "be_me")]
-    agg[, name := paste0(hcl_label, ": ", characteristic)]
-    agg[, ret := ret / (sd(ret)*sqrt(12)/0.1), by = .(region, name)]
-    agg %>% setorder(region, name, eom)
-    agg[, cumret_app := cumsum(ret), by = .(region, name)]
-    plot <- agg %>%
-      ggplot(aes(eom, cumret_app, colour = region)) +
-      geom_line() +
-      facet_wrap(~name) +
-      labs(y = y_axis) +
-      theme(
-        legend.position = "top",
-        legend.title = element_blank(),
-        axis.title.x = element_blank()
-      )
-  }
-  plot
+  agg %>% setorder(region, eom)
+  agg[, cumret_app := cumsum(ret), by = region]
+  plot <- agg %>%
+    ggplot(aes(eom, cumret_app, colour = region)) +
+    geom_line() +
+    labs(y = y_axis) +
+    theme(
+      legend.position = c(0.85, 0.35),
+      legend.title = element_blank(),
+      axis.title.x = element_blank()
+    )
+  # Table
+  tbl <- agg %>%
+    group_by(region) %>%
+    summarise(
+      n = n(),
+      meanret = mean(ret),
+      vol = sd(ret),
+      ret_vol = meanret/vol*sqrt(12),
+      t = meanret/(vol/sqrt(n))
+    ) %>%
+    mutate(meanret = meanret*12)
+  tbl %>% 
+    select(region, ret_vol, t) %>%
+    pivot_longer(c(ret_vol, t)) %>%
+    mutate(
+      value = formatC(value, digits=2, format = "f"),
+      value = if_else(name == "t", paste0("(", value, ")"), value)
+    ) %>%
+    mutate(
+      region = if_else(name == "t", "", region)
+    ) %>%
+    select(-name) %>%
+    rename("Region"=region, "Full sample"=value) %>%
+    xtable(align = "llc") %>%
+    print(include.rownames = F)
+  # Output
+  return(plot)
 }
+
+# Plot OOS performance of significant factors
+plot_sig_oos <- function(sig_oos_pfs, sig_type, cutoff_2012, first_date, leg_pos) {
+  full <- sig_oos_pfs %>%
+    filter(eom >= first_date) %>% 
+    group_by(region, type, significant) %>%
+    mutate(
+      a = ret - cov(mkt,ret)/var(mkt)*mkt
+    )  %>%
+    summarise(
+      n = n(),
+      meanret = mean(ret),
+      sd = sd(ret),
+      sr = meanret/sd * sqrt(12),
+      alpha = mean(a),
+      resvol = sd(a),
+      ir = alpha/resvol*sqrt(12),
+      t_alpha = alpha/(resvol/sqrt(n))
+    ) %>%
+    mutate(alpha = alpha*12) %>%
+    filter(region %in% c("us", "world_ex_us") & type == sig_type) %>%
+    setDT()
+  
+  post_harvey <- sig_oos_pfs %>%
+    filter(eom >= first_date) %>%
+    group_by(region, type, significant) %>%
+    mutate(
+      a = ret - cov(mkt,ret)/var(mkt)*mkt 
+    )  %>%
+    filter(eom >= as.Date("2013-01-01")) %>%
+    summarise(
+      n = n(),
+      meanret = mean(ret),
+      sd = sd(ret),
+      sr = meanret/sd * sqrt(12),
+      alpha = mean(a),
+      resvol = sd(a),
+      ir = alpha/resvol*sqrt(12),
+      t_alpha = alpha/(resvol/sqrt(n))
+    ) %>%
+    mutate(alpha = alpha*12) %>%
+    filter(region %in% c("us", "world_ex_us") & type == sig_type) %>%
+    setDT()
+  
+  cumret <- sig_oos_pfs %>%
+    filter(eom >= first_date) %>%
+    group_by(region, type, significant) %>%
+    arrange(region, type, significant, eom) %>%
+    filter(type == sig_type & region %in% c("us", "world_ex_us")) %>%
+    mutate(
+      alpha = ret - cov(mkt,ret)/var(mkt)*mkt,
+      alpha = alpha / (sd(alpha)*sqrt(12)/0.1),
+      cum_alpha = cumsum(alpha),
+      region_pretty = case_when(
+        region == "us" ~ "US",
+        region == "world_ex_us" ~ "World ex. US"
+      )
+    )
+  
+  # Figure 
+  sig_oos <- cumret %>%
+      ggplot(aes(eom, cum_alpha, colour = region_pretty)) +
+      geom_line() +
+      labs(y = "Cumulative Alpha") +
+      theme(
+        axis.title.x = element_blank(),
+        legend.position = leg_pos,
+        legend.title = element_blank()
+      )
+  
+  # Table for caption
+  tbl <- rbind(
+    full %>% select(region, ir, t_alpha) %>% mutate(sample = "Full sample"),
+    post_harvey %>% select(region, ir, t_alpha) %>% mutate(sample = "Post Harvey et al")
+  ) %>%
+    pivot_longer(c(ir, t_alpha)) %>%
+    mutate(
+      value = formatC(value, digits=2, format = "f"),
+      value = if_else(name == "t_alpha", paste0("(", value, ")"), value)
+    ) %>%
+    pivot_wider(names_from = sample, values_from = value) %>%
+    mutate(
+      region = case_when(
+        region=="us" ~ "IR: US",
+        region == "world_ex_us" ~ "IR: World ex. US"
+      ),
+      region = if_else(name == "t_alpha", "", region)
+    ) %>%
+    select(-name) %>%
+    rename("Region"=region)
+  
+  if (cutoff_2012) {
+    sig_oos <- sig_oos + geom_vline(xintercept = as.Date("2012-12-31"), linetype = "dashed", alpha = 0.5)
+    tbl %>% xtable(align = "llcc") %>% print(include.rownames = F)
+  } else {
+    tbl %>% select(-`Post Harvey et al`) %>% xtable(align = "llc") %>% print(include.rownames = F)
+  }
+  # Output 
+  return(sig_oos)
+}
+
 
 # EB Posterior checks
 eb_plots <- function(eb, plot = "shrinkage") {

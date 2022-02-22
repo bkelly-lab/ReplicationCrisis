@@ -5,9 +5,9 @@ options(dplyr.summarise.inform = FALSE)
 
 # User Input -----------------------
 # Paths
-data_path <- "C:/Users/tij.fi/Dropbox (CBS)/International Stock Data/Public/Data" # Set to path with global characteristics data.
+data_path <- "../../Data" # Set to path with global characteristics data.
 # Start Date
-start <- as.Date("2019-12-31")
+start <- as.Date("2020-12-31")
 
 # Data -----------------------------
 # Characteristics
@@ -23,14 +23,14 @@ chars <- char_info$characteristic
 nyse_size_cutoffs <- fread(paste0(data_path, "/nyse_cutoffs.csv"), colClasses = c("eom"="character"))
 nyse_size_cutoffs[, eom := as.Date(eom, format = "%Y%m%d")]
 
-# CRSP Return Cutoffs
-crsp_ret_cutoffs <- fread(paste0(data_path, "/crsp_return_cutoffs.csv"), colClasses = c("eom"="character"))
-crsp_ret_cutoffs[, eom := as.Date(eom, format = "%Y%m%d")]
-crsp_ret_cutoffs[, eom_lag1 := floor_date(eom, unit = "month") - 1]  # Because we use ret_exc_lead1m
+# Return Cutoffs
+ret_cutoffs <- fread(paste0(data_path, "/return_cutoffs.csv"), colClasses = c("eom"="character"))
+ret_cutoffs[, eom := as.Date(eom, format = "%Y%m%d")]
+ret_cutoffs[, eom_lag1 := floor_date(eom, unit = "month") - 1]  # Because we use ret_exc_lead1m
 
 # Data
 data <- fread(paste0(data_path, "/Characteristics/usa.csv"), 
-              select = c("excntry", "id", "eom", "source", "comp_exchg", "crsp_exchcd", "size_grp", "ret_exc", "ret_exc_lead1m", "me", chars), colClasses = c("eom"="character"))
+              select = c("excntry", "id", "eom", "source_crsp", "comp_exchg", "crsp_exchcd", "size_grp", "ret_exc", "ret_exc_lead1m", "me", chars), colClasses = c("eom"="character"))
 data[, eom := as.Date(lubridate::fast_strptime(eom, format = "%Y%m%d"))]
 # ME CAP
 data <- nyse_size_cutoffs[, .(eom, nyse_p80)][data, on = "eom"]
@@ -39,14 +39,14 @@ data[, me_cap := pmin(me, nyse_p80)][, nyse_p80 := NULL]
 data <- data[!is.na(size_grp) & !is.na(me) & !is.na(ret_exc_lead1m)]
 
 # Winsorize Compustat Returns
-data <- crsp_ret_cutoffs[, .(eom, "p001"=ret_exc_0_1, "p999"=ret_exc_99_9)][data, on = "eom"]
-data[source == "COMPUSTAT" & ret_exc > p999, ret_exc := p999]
-data[source == "COMPUSTAT" & ret_exc < p001, ret_exc := p001]
+data <- ret_cutoffs[, .(eom, "p001"=ret_exc_0_1, "p999"=ret_exc_99_9)][data, on = "eom"]
+data[source_crsp == 0 & ret_exc > p999, ret_exc := p999]
+data[source_crsp == 0 & ret_exc < p001, ret_exc := p001]
 data[, c("p001", "p999") := NULL]
-data <- crsp_ret_cutoffs[, .("eom" = eom_lag1, "p001"=ret_exc_0_1, "p999"=ret_exc_99_9)][data, on = "eom"]
-data[source == "COMPUSTAT" & ret_exc_lead1m > p999, ret_exc_lead1m := p999]
-data[source == "COMPUSTAT" & ret_exc_lead1m < p001, ret_exc_lead1m := p001]
-data[, c("source", "p001", "p999") := NULL]
+data <- ret_cutoffs[, .("eom" = eom_lag1, "p001"=ret_exc_0_1, "p999"=ret_exc_99_9)][data, on = "eom"]
+data[source_crsp == 0 & ret_exc_lead1m > p999, ret_exc_lead1m := p999]
+data[source_crsp == 0 & ret_exc_lead1m < p001, ret_exc_lead1m := p001]
+data[, c("source_crsp", "p001", "p999") := NULL]
 
 # Create 1 month separated observations
 returns <- tidyr::crossing("id" = unique(data$id), "eom" = unique(data$eom)) %>% setDT()
@@ -57,7 +57,7 @@ returns[, last := floor_date(max(eom[!is.na(ret_exc)]), unit = "month") + months
 returns <- returns[eom <= last][, last := NULL]
 returns %>% setorder(id, eom)
 
-pf_func <- function(chars, pfs, bps, bp_min_n, horizon) {
+pf_func <- function(chars, pfs, bps, bp_min_n, min_stocks, horizon) {
   # Realized Returns 
   ret_lead <- 1:horizon %>% lapply(function(h) {
     if (h==1) {
@@ -99,17 +99,17 @@ pf_func <- function(chars, pfs, bps, bp_min_n, horizon) {
     # HML
     pf_returns[, .(
       characteristic = x,
+      n_stocks_min = as.integer(min(n[pf==pfs], n[pf==1])),
       ret_ew = ret_ew[pf == pfs] - ret_ew[pf == 1],
       ret_vw = ret_vw[pf == pfs] - ret_vw[pf == 1],
       ret_vw_cap = ret_vw_cap[pf == pfs] - ret_vw_cap[pf == 1]
-    ), by = .(eom_ret, lead)][!is.na(ret_ew)]
+    ), by = .(eom_ret, lead)][!is.na(ret_ew) & n_stocks_min >= min_stocks]
   }) %>% rbindlist()
 }
 
 # Output 
-system.time(hml_nonmc3 <- chars %>% pf_func(pfs = 3, bps = "non_mc", bp_min_n = 5, horizon = 12))  # 47 min
-system.time(hml_nyse10 <- chars %>% pf_func(pfs = 10, bps = "nyse", bp_min_n = 5, horizon = 12))
-
+system.time(hml_nonmc3 <- chars %>% pf_func(pfs = 3, bps = "non_mc", bp_min_n = 5, min_stocks = 5, horizon = 12))  # 47 min
+system.time(hml_nyse10 <- chars %>% pf_func(pfs = 10, bps = "nyse", bp_min_n = 5, min_stocks = 5, horizon = 12))
 
 rr <- list(hml_nonmc3, hml_nyse10) %>% lapply(function(dt) {
   repl_data <- char_info[dt, on = "characteristic"] %>%
@@ -152,7 +152,7 @@ rr <- list(hml_nonmc3, hml_nyse10) %>% lapply(function(dt) {
   
   # Our Benchline Raw Return
   baseline <- repl_data %>%
-    filter(horizon == 1 & eom_ret <= as.Date("2019-12-31")) %>%
+    filter(horizon == 1 & eom_ret <= start) %>%
     rr_func() %>%
     mutate(name = "Baseline")
   # Difference in sample period
@@ -182,7 +182,7 @@ terc_sample <- rr[[1]] %>% filter(name == "Three Horizons, Shorter Sample" & typ
 terc_factors <- rr[[1]] %>% filter(name == "Three Horizons, Shorter Sample, Difference in Factors" & type == "ret_vw") %>% pull(rr)
 dec_factors <- rr[[2]] %>% filter(name == "Three Horizons, Shorter Sample, Difference in Factors" & type == "ret_vw") %>% pull(rr)
 
-# From 56.2% to 44.4% with value weights
+# From vw_cap to vw
 terc_base-terc_base_vw
 # Multiple Horizons
 terc_base_vw-terc_hor
