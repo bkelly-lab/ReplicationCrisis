@@ -11,7 +11,9 @@ The .sas files construct the stock-level characteristics and factor portfolio re
 5. Replace line 8 with the path to the scratch folder created in step 3. 
 6. Run `main.sas`.  
 
-For step 6, we suggest that you make a background submit. To do so, locate the `main.sas` file in your _Global Data_ folder, right-clik the file and select "Background Submit". Running the code will take around 24 hours. When the code has finished running, your scratch folder will contain a folder called _output_. This folder contains daily and monthly market returns, market equity breakpoints from NYSE and return breakpoints from CRSP. Furthermore, the scratch folder will contain the main dataset called _world_data.sas7bdat_. If you wish to have the data in .csv format, run the  `%save_main_data_csv()` macro on line 220. The macro will create a zip folder with a separate .csv file for each country and save it in the output folder. Importantly, the datasets only include the main observation of common stocks that are primary securities, with non-missing market equity data. 
+For step 6, we suggest that you make a background submit. To do so, locate the `main.sas` file in your _Global Data_ folder, right-clik the file and select "Background Submit". Running the code will take around 24-36 hours. 
+When the code has finished running, your scratch folder will contain a folder called _output_. This folder contains daily and monthly stocks returns, daily and monthly market returns, market equity breakpoints from NYSE and return breakpoints to use for winsorization. 
+If `save_csv=1` on line 12, the folder will also hold the data country-by-country in .csv format. Importantly, these files only include the main observation of ordinary common stocks that are the primary securities of the underlying firm, and traded on a main exchange. To include all stocks, modify the 'save_main_data_csv()' macro. 
 
 Note that the space in the scratch directory is shared across users in your institution. It's best practice to delete files after downloading what you need. Furthermore, files in the scratch directory is deleted after 7 days.
 
