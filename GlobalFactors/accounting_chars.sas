@@ -215,7 +215,7 @@ Description:
 		
 		netdebt_x		= debt_x - coalesce(che, 0); /* Net Debt for calculating Enterprise Value */
 		txditc_x		= coalesce(txditc, sum(txdb, itcb));
-		be_x			= seq_x+coalesce(txditc_x, 0)-coalesce(pstk_x, 0); /* The last one is sort of controversial in the sense that it is not what FF does*/
+		be_x			= seq_x+coalesce(txditc_x, 0)-coalesce(pstk_x, 0); 
 		bev_x			= coalesce(icapt+coalesce(dlc, 0)-coalesce(che, 0), netdebt_x+seq_x+coalesce(mib, 0));
 		
 		coa_x			= ca_x - che;  /* Operating (non cash) current assets */

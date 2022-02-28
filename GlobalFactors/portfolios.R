@@ -16,9 +16,9 @@ library(data.table)
 
 # User Input -----------------------
 # Paths
-data_path <- "../../Data"
-output_path <- "../../PaperFactors"
-legacy_path <- "../../../Pre-Public/Data"
+data_path <- "Data"
+output_path <- "PaperFactors"
+legacy_path <- "Legacy"
 # Countries
 countries <- list.files(path = paste0(data_path, "/Characteristics")) %>% str_remove(".csv")
 # Chars 
@@ -65,7 +65,7 @@ chars <- c(
 )
 # Portfolio settings
 settings <- list(
-  end_date = as.Date("2020-12-31"),
+  end_date = as.Date("2021-12-31"),
   pfs = 3,
   source = c("CRSP", "COMPUSTAT"),                           
   wins_ret = T,
@@ -164,11 +164,10 @@ portfolios <- function(
     ind_data[, gics := as.numeric(substr(ind_data$gics, 1, 2))]
     ind_gics <- ind_data[, .(
       n = .N,
-      excntry = str_to_upper(excntry),
       ret_ew = mean(ret_exc_lead1m),
       ret_vw = sum(ret_exc_lead1m * me) / sum(me),
       ret_vw_cap = sum(ret_exc_lead1m * me_cap) / sum(me_cap) 
-    ), by = .(gics, eom)]
+    ), by = .(gics, eom)][, excntry := str_to_upper(excntry)]
     # Lead month to match using leaded returns
     ind_gics[, eom := ceiling_date(eom+1, unit = "month")-1]
     ind_gics <- ind_gics[n >= bp_min_n]
@@ -178,11 +177,10 @@ portfolios <- function(
       ind_data <- ind_data[!is.na(ff49)]
       ind_ff49 <- ind_data[, .(
         n = .N,
-        excntry = str_to_upper(excntry),
         ret_ew = mean(ret_exc_lead1m),
         ret_vw = sum(ret_exc_lead1m * me) / sum(me),
         ret_vw_cap = sum(ret_exc_lead1m * me_cap) / sum(me_cap) 
-      ), by = .(ff49, eom)]
+      ), by = .(ff49, eom)][, excntry := str_to_upper(excntry)]
       ind_ff49[, eom := ceiling_date(eom+1, unit = "month")-1]
       ind_ff49 <- ind_ff49[n >= bp_min_n]
     }

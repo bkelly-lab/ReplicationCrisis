@@ -12,7 +12,7 @@ proc delete data = _all_ ; run ;
 %let save_csv = 1;     * Should the main data set be save country-by-country in a .csv format?;
 %let save_daily_ret = 1;   * Save daily stocks returns country-by-country in a .csv format?;
 %let save_monthly_ret = 1;   * Save monthly stocks returns  in a .csv format;
-%let end_date = '31DEC2020'd; * Date of last observation: CRSP data is only updated annually, so we keep this updating frequency for consistency. Should be incremented every time there's an update to the CRSP database);
+%let end_date = '31DEC2021'd; * Date of last observation: CRSP data is only updated annually, so we keep this updating frequency for consistency. Should be incremented every time there's an update to the CRSP database);
 
 ***************************************************************************
 * Libraries and Functions
@@ -77,7 +77,7 @@ proc delete data=world_msf2 world_msf3; run;
 
 * Return cutoffs;
 %return_cutoffs(data=scratch.world_msf, freq=m, out=scratch.return_cutoffs, crsp_only=0);
-%return_cutoffs(data=scratch.world_dsf, freq=d, out=scratch.return_cutoffs_daily, crsp_only=0); 
+%return_cutoffs(data=scratch.world_dsf, freq=d, out=scratch.return_cutoffs_daily, crsp_only=0);
 
 *****************************************************************************
 * Market Returns
@@ -96,7 +96,7 @@ proc delete data=world_msf2 world_msf3; run;
 *****************************************************************************
 * Create Characteristics Based on Monthly Market Data
 **************************************************************************** ;
-%market_chars_monthly(out=scratch.market_chars_m, data=scratch.world_msf, market_ret = scratch.market_returns, local_currency=0); 
+%market_chars_monthly(out=scratch.market_chars_m, data=scratch.world_msf, market_ret=scratch.market_returns, local_currency=0); 
 
 * Free up space;
 proc datasets library=work kill nolist; quit;
@@ -156,6 +156,12 @@ proc datasets library=work kill nolist; quit;
 				  __stats= mktcorr);
 %finish_daily_chars(out=scratch.market_chars_d);
 
+%if &delete_temp.=1 %then %do;
+	proc delete data=
+		scratch.corwin_schultz scratch.roll_21d scratch.roll_126d scratch.roll_252d scratch.roll_1260d scratch.ap_factors_daily scratch.ap_factors_monthly ; 
+	run;
+%end;
+
 * Free up space;
 proc datasets library=work kill nolist; quit;
 
@@ -191,6 +197,13 @@ data world_data5;
 		market_equity enterprise_value book_equity assets sales net_income; 
 	set world_data4;
 run;
+
+* Delete Temporary Files;
+%if &delete_temp.=1 %then %do;
+	proc delete data=
+		scratch.beta_60m scratch.qmj scratch.resmom_ff3_12_1 scratch.resmom_ff3_6_1 scratch.mp_factors scratch.firm_age scratch.market_chars_d; 
+	run;
+%end;
 
 * Save combined data;
 proc sort data=world_data5 out=scratch.world_data nodup; by id eom; run;
@@ -246,11 +259,6 @@ option notes;
 * Delete Temporary Files;
 %if &delete_temp.=1 %then %do;
 	proc delete data=
-		scratch.beta_60m scratch.qmj scratch.resmom_ff3_12_1 scratch.resmom_ff3_6_1 scratch.mp_factors
-		scratch.ap_factors_daily scratch.ap_factors_monthly
-		scratch.corwin_schultz scratch.roll_21d scratch.roll_126d scratch.roll_252d scratch.roll_1260d
-		scratch.world_data_prelim scratch.world_dsf scratch.world_msf 
-		scratch.market_chars_m scratch.market_chars_d scratch.acc_chars_world
-		scratch.firm_age; 
+		scratch.world_dsf scratch.world_msf scratch.world_data; 
 	run;
 %end;

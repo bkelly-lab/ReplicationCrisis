@@ -77,38 +77,62 @@
 */
 %macro return_cutoffs(data=, freq=, out=, crsp_only=); 
 	%if &freq.=m %then %do;
-		%if &crsp_only.=1 %then %do;
-			proc sort data=&data.(where=(source_crsp=1 and common=1 and obs_main=1 and exch_main=1 and primary_sec=1 and excntry ^= 'ZWE' and not missing(ret_exc))) out=base; by eom; run; 
-		%end;
-		%if &crsp_only.=0 %then %do;
-			proc sort data=&data.(where=(common=1 and obs_main=1 and exch_main=1 and primary_sec=1 and excntry ^= 'ZWE' and not missing(ret_exc))) out=base; by eom; run;
-		%end;
-		proc univariate data=base noprint;
-	  		by eom;
-	  		var ret_exc;
-	  		output out=&out. n=n pctlpts=0.1 1 99 99.9 pctlpre=ret_exc_ ;
-	  	run;
-	  %end;
+		%let date_var = eom;
+		%let by_vars = eom;
+	%end;
 	%if &freq.=d %then %do;
-		%if &crsp_only.=1 %then %do;
-			proc sort data=&data.(where=(source_crsp=1 and common=1 and obs_main=1 and exch_main=1 and primary_sec=1 and excntry ^= 'ZWE' and not missing(ret_exc))) out=base; by date; run;
-		%end;
-		%if &crsp_only.=0 %then %do;
-			proc sort data=&data.(where=(common=1 and obs_main=1 and exch_main=1 and primary_sec=1 and excntry ^= 'ZWE' and not missing(ret_exc))) out=base; by date; run;
-		%end;
+		%let date_var = date;
+		%let by_vars = year month;
+	%end;
+	
+	%if &crsp_only.=1 %then %do;
+		proc sort data=&data.(where=(source_crsp=1 and common=1 and obs_main=1 and exch_main=1 and primary_sec=1 and excntry ^= 'ZWE' and not missing(ret_exc))) out=base; by &date_var.; run; 
+	%end;
+	%if &crsp_only.=0 %then %do;
+		proc sort data=&data.(where=(common=1 and obs_main=1 and exch_main=1 and primary_sec=1 and excntry ^= 'ZWE' and not missing(ret_exc))) out=base; by &date_var.; run;
+	%end;
+	
+	%if &freq.=d %then %do;
 		data base; 
 			set base;
 			year=year(date);
 			month=month(date);
 		run;
-		
+	%end;
+	
+	%let ret_types = ret ret_local ret_exc; 
+	%do i=1 %to %sysfunc(countw(&ret_types.));  
+		%let ret_type = %scan(&ret_types., &i.);
 		proc univariate data=base noprint;
-	  		by year month;
-	  		var ret_exc;
-	  		output out=&out. n=n pctlpts=0.1 1 99 99.9 pctlpre=ret_exc_;
+	  		by &by_vars.;
+	  		var &ret_type.;
+	  		output out=cutoffs n=n pctlpts=0.1 1 99 99.9 pctlpre=&ret_type._;
 	  	run;
-	  %end;
-	  proc delete data=base; run;
+	  	%if &i.=1 %then %do;
+	  		data &out.; set cutoffs; run;
+	  	%end;
+	  	%else %do;
+	  		%if &freq.=m %then %do;
+	  			proc sql;
+		  			create table &out. as
+		  			select a.*, b.&ret_type._0_1, b.&ret_type._1, b.&ret_type._99, b.&ret_type._99_9
+		  			from &out. as a
+		  			left join cutoffs as b
+		  			on a.eom=b.eom;
+		  		quit;
+	  		%end;
+	  		%if &freq.=d %then %do;
+	  			proc sql;
+		  			create table &out. as
+		  			select a.*, b.&ret_type._0_1, b.&ret_type._1, b.&ret_type._99, b.&ret_type._99_9
+		  			from &out. as a
+		  			left join cutoffs as b
+		  			on a.year=b.year and a.month=b.month;
+		  		quit;
+	  		%end;
+	  	%end;
+	%end;
+	proc delete data= cutoffs base; run;
 %mend;
 
 /* MACRO: NYSE SIZE CUTOFFS
@@ -364,7 +388,7 @@ Importantly, a given company (gvkey) can potentially have up to 3 primary securi
 		create table __crsp_sf1 as
 		select a.permno, a.permco, a.date, (a.prc < 0) as bidask, abs(a.prc) as prc, a.shrout/1000 as shrout, calculated prc * calculated shrout as me,
 		   a.ret, a.retx, a.cfacshr, a.vol, 
-		   case when a.prc > 0 and a.askhi > 0 then a.askhi else . end as prc_high,  /* Highest price when prc is not the bid-ask average: https://wrds-web.wharton.upenn.edu/wrds/query_forms/variable_documentation.cfm?vendorCode=CRSP&libraryCode=crspa&fileCode=dsf&id=askhi*/
+		   case when a.prc > 0 and a.askhi > 0 then a.askhi else . end as prc_high,   /* Highest price when prc is not the bid-ask average: https://wrds-web.wharton.upenn.edu/wrds/query_forms/variable_documentation.cfm?vendorCode=CRSP&libraryCode=crspa&fileCode=dsf&id=askhi*/
 		   case when a.prc > 0 and a.bidlo > 0 then a.bidlo else . end as prc_low,    /* Lowest price when prc is not the bid-ask average: https://wrds-web.wharton.upenn.edu/wrds/query_forms/variable_documentation.cfm?vendorCode=CRSP&libraryCode=crspa&fileCode=dsf&id=bidlo */
 		   b.shrcd, b.exchcd, c.gvkey, c.liid as iid, /*http://www.crsp.org/products/documentation/crspccmlink-security-link-history*/
 		   b.exchcd in (1, 2, 3) as exch_main			
@@ -758,16 +782,14 @@ Importantly, a given company (gvkey) can potentially have up to 3 primary securi
 		
 		/* Output */
 		proc sort nodupkey data=__comp_sf6 out=&out.; by gvkey iid datadate; run;
-		
-		/*proc delete data=&base.; run;*/
 	%end;
 	
 	
 	/* proc freq data=comp_dsf; tables ret_day_dif; run; *Check: 97.2% of non missing ret_day_dif are <=3. 98.8% are <=4; 99.75% are <=10. This might be a reasonable general cutoff for settings returns to 0*/
 	proc delete data=__firm_shares1 __firm_shares2 fx 
-		__comp_dsf_na __comp_dsf_global __comp_dsf1 __comp_dsf2 __comp_dsf3 __comp_sf4 __comp_sf5
+		__comp_dsf_na __comp_dsf_global __comp_dsf1 __comp_dsf2 __comp_dsf3
 		__returns __sec_info __delist1 __delist2 __delist3
-		__comp_sf1 __comp_sf2 __comp_sf3 __comp_sf4 __comp_sf5 __comp_sf6 __excntry __exchanges &base.; run;
+		__comp_sf1 __comp_sf2 __comp_sf3 __comp_sf4 __comp_sf5 __comp_sf6 __exchanges &base.; run;
 %mend prepare_comp_sf;
 
 /* COMBINE CRSP AND COMPUSTAT WITH CRSP PREFERENCE*/
@@ -775,11 +797,11 @@ Importantly, a given company (gvkey) can potentially have up to 3 primary securi
 	/* Monthly Files */
 	proc sql;
 		create table __msf_world1 as
-		select permno as id, permno, permco, gvkey, iid, 'USA' as excntry length=3, exch_main, (shrcd in (10, 11, 12)) as common, 1 as primary_sec,
+		select permno as id, PERMNO as permno, PERMCO as permco, GVKEY as gvkey, iid, 'USA' as excntry length=3, exch_main, (shrcd in (10, 11, 12)) as common, 1 as primary_sec,
 			bidask, shrcd as crsp_shrcd, exchcd as crsp_exchcd, '' as comp_tpci, . as comp_exchg,
 			'USD' as curcd, 1 as fx, date, intnx('month',date,0,'E') as eom format=YYMMDDN8., 
 		   	cfacshr as adjfct, shrout as shares, me, me_company, prc, prc as prc_local, prc_high, prc_low, dolvol, vol as tvol, 
-		   	ret, ret as ret_local, ret_exc, 1 as ret_lag_dif, div_tot, . as div_cash, . as div_spc, 1 as source_crsp
+		   	RET as ret, ret as ret_local, ret_exc, 1 as ret_lag_dif, div_tot, . as div_cash, . as div_spc, 1 as source_crsp
 		from &crsp_msf.
 		outer union corr
 		select case	when prxmatch("/W/", iid) then input(cats('3', gvkey, substr(iid, 1, 2)), 9.0)
@@ -897,7 +919,7 @@ Importantly, a given company (gvkey) can potentially have up to 3 primary securi
 		%if &freq.=m %then %do;
 			proc sql;
 				create table __common_stocks3 as
-				select a.*, b.ret_exc_0_1, b.ret_exc_99_9
+				select a.*, b.ret_exc_0_1, b.ret_exc_99_9, b.ret_0_1, b.ret_99_9, b.ret_local_0_1, b.ret_local_99_9
 				from __common_stocks2 as a 
 				left join &wins_data. as b
 				on a.eom=b.eom;
@@ -906,23 +928,37 @@ Importantly, a given company (gvkey) can potentially have up to 3 primary securi
 		%if &freq.=d %then %do;
 			proc sql;
 				create table __common_stocks3 as
-				select a.*, b.ret_exc_0_1, b.ret_exc_99_9
+				select a.*, b.ret_exc_0_1, b.ret_exc_99_9, b.ret_0_1, b.ret_99_9, b.ret_local_0_1, b.ret_local_99_9
 				from __common_stocks2 as a 
 				left join &wins_data. as b
 				on year(a.date)=b.year and month(a.date)=b.month;
 			quit;
 		%end;
 		proc sql;
+			* Winsorize returns;
+			update __common_stocks3 
+			set ret = ret_99_9
+			where ret > ret_99_9 and source_crsp = 0 and not missing(ret);		
+			update __common_stocks3 
+			set ret = ret_0_1
+			where ret < ret_0_1 and source_crsp = 0 and not missing(ret);
+			* Winsorize local returns;
+			update __common_stocks3 
+			set ret_local = ret_local_99_9
+			where ret_local > ret_local_99_9 and source_crsp = 0 and not missing(ret_local);		
+			update __common_stocks3 
+			set ret_local = ret_local_0_1
+			where ret_local < ret_local_0_1 and source_crsp = 0 and not missing(ret_local);
+			* Winsorize excess returns;
 			update __common_stocks3 
 			set ret_exc = ret_exc_99_9
-			where ret_exc > ret_exc_99_9 and source_crsp = 0 and not missing(ret_exc);
-			
+			where ret_exc > ret_exc_99_9 and source_crsp = 0 and not missing(ret_exc);		
 			update __common_stocks3 
 			set ret_exc = ret_exc_0_1
 			where ret_exc < ret_exc_0_1 and source_crsp = 0 and not missing(ret_exc);
 			
 			alter table __common_stocks3
-			drop ret_exc_0_1, ret_exc_99_9;
+			drop ret_exc_0_1, ret_exc_99_9, ret_0_1, ret_99_9, ret_local_0_1, ret_local_99_9;
 		quit;
 		
 	%end;
@@ -957,6 +993,8 @@ Importantly, a given company (gvkey) can potentially have up to 3 primary securi
 			having stocks / max(stocks) >= 0.25; /* With less than 25% of stocks trading, it's likely that the date is not an official trading date */
 		quit;
 	%end;
+	
+	proc delete data= __common_stocks1 __common_stocks2 __common_stocks3 mkt1; run; 
 %mend;
 
 * MACRO: AP_FACTORS

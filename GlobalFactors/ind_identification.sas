@@ -385,8 +385,8 @@
 	   	OUT: name of output dataset */
 %macro HGICS_JOIN(out=);
 	/* Construct NA and global historical gics data */
-	%COMP_HGICS(lib = CO_HGIC, OUT = NA_HGICS);
-	%COMP_HGICS(lib = G_CO_HGIC, OUT = G_HGICS);
+	%comp_hgics(lib = co_hgic, OUT = na_hgics);
+	%comp_hgics(lib = g_co_hgic, OUT = g_hgics);
 	
 	proc sql;
 		create table gjoin1 as
@@ -405,9 +405,9 @@
 		drop na_gvkey na_date na_gics g_gvkey g_date g_gics;
 	run;
 	
-	proc sort data = gjoin2 out= &OUT nodup; by gvkey date; run;
+	proc sort data = gjoin2 out= &out nodup; by gvkey date; run;
 	
-	proc delete data = NA_HGICS G_HGICS gjoin1 gjoin2; run;
+	proc delete data = na_hgics g_hgics gjoin1 gjoin2; run;
 %mend;
 
 * MACRO: COMP_INDUSTRY
