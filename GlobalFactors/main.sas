@@ -201,7 +201,9 @@ run;
 * Delete Temporary Files;
 %if &delete_temp.=1 %then %do;
 	proc delete data=
-		scratch.beta_60m scratch.qmj scratch.resmom_ff3_12_1 scratch.resmom_ff3_6_1 scratch.mp_factors scratch.firm_age scratch.market_chars_d; 
+		scratch.world_data_prelim
+		scratch.beta_60m scratch.qmj scratch.resmom_ff3_12_1 scratch.resmom_ff3_6_1 
+		scratch.mp_factors scratch.firm_age scratch.market_chars_d; 
 	run;
 %end;
 
@@ -259,6 +261,8 @@ option notes;
 * Delete Temporary Files;
 %if &delete_temp.=1 %then %do;
 	proc delete data=
+		scratch.market_returns_daily scratch.market_returns
+		scratch.nyse_cutoffs scratch.return_cutoffs scratch.return_cutoffs_daily
 		scratch.world_dsf scratch.world_msf scratch.world_data; 
 	run;
 %end;
