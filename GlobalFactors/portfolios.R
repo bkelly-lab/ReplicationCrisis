@@ -610,3 +610,10 @@ if (settings$daily_pf) {
     lms_daily[date <= settings$end_date & excntry==exc] %>% fwrite(file = paste0(cnt_folder_daily, "/", exc, ".csv"))
   }
 }
+
+# Save supplementary information
+nyse_size_cutoffs %>% fwrite(file = paste0(output_path, "/nyse_cutoffs.csv"))
+ret_cutoffs %>% fwrite(file = paste0(output_path, "/return_cutoffs.csv"))
+if (settings$daily_pf) {
+  ret_cutoffs_daily %>% fwrite(file = paste0(output_path, "/return_cutoffs_daily.csv"))
+}
