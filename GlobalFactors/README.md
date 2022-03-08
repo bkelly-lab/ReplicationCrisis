@@ -1,5 +1,14 @@
 ## Overview
-This repository contains code that create a dataset of global stock returns and characteristics. The dataset was created for the paper [Is There a Replication Crisis in Finance?](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=3774514) by Jensen, Kelly and Pedersen (2021). Please cite this paper if you are using the code or data. Follow this [link](https://www.dropbox.com/sh/61j1v0sieq9z210/AACdJ68fs5_eT_eJMunwMBWia?dl=0) for a detailed documentation of the data sets.
+This repository contains code that create a dataset of global stock returns and characteristics. The dataset was created for the paper [Is There a Replication Crisis in Finance?](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=3774514) by Jensen, Kelly and Pedersen (2022). Please cite this paper if you are using the code or data: 
+```
+@article{JensenKellyPedersen2022,
+   author = {Jensen, Theis Ingerslev and Kelly, Bryan T and Pedersen, Lasse Heje},
+   journal = {Journal of Finance, Forthcoming},
+   title = {Is There A Replication Crisis In Finance?},
+   year = {2022}
+}
+```
+Follow this [link](https://www.dropbox.com/sh/61j1v0sieq9z210/AACdJ68fs5_eT_eJMunwMBWia?dl=0) for a detailed documentation of the data sets.
 
 ## How to Generate Global Stock Returns and Stock Characteristics
 The .sas files construct the stock-level characteristics and factor portfolio returns for all countries. The code requires a connection to WRDS servers. Below we outline our preferred approach to creating the dataset:
@@ -11,7 +20,7 @@ The .sas files construct the stock-level characteristics and factor portfolio re
 5. Replace line 8 with the path to the scratch folder created in step 3. 
 6. Run `main.sas`.  
 
-For step 6, we suggest that you make a background submit. To do so, locate the `main.sas` file in your _Global Data_ folder, right-clik the file and select "Background Submit". Running the code will take around 24-36 hours. 
+For step 6, we suggest that you make a background submit. To do so, locate the `main.sas` file in your _Global Data_ folder, right-clik the file and select "Background Submit". Running the code will take around 24-48 hours. 
 When the code has finished running, your scratch folder will contain a folder called _output_. This folder contains daily and monthly stocks returns, daily and monthly market returns, market equity breakpoints from NYSE and return breakpoints to use for winsorization. 
 If `save_csv=1` on line 12, the folder will also hold the data country-by-country in .csv format. Importantly, these files only include the main observation of ordinary common stocks that are the primary securities of the underlying firm, and traded on a main exchange. To include all stocks, modify the 'save_main_data_csv()' macro. 
 
@@ -29,24 +38,24 @@ The file `portfolio.R` generates country level factor returns based on the datas
 	2. Replace the variable `output_path` with the path to the folder where you wish to save the factor returns. 
 	3. Replace the variable `legacy_path` with the path to the folder where you wish to save earlier versions of the factor output. If you don't wish to save earlier version, set the variabl to         `NULL`.
 	4. The variable `countries` controls which countries to generate factor returns for. By default, it selects all the countries in `data_path`.
-	5. The variable `chars` controls which characteristics to use for creating factor returns. By default, it is set to the 153 characteristics from Jensen, Kelly and Pedersen (2021). Any             column in the charactersitic dataset can be used to as the basis of a factor. 
-	6. The variable `settings` controls the end date, number of portfolio, which breakpoints to use, the data source, whether to winsorize Compustat returns, the minimum amount of stocks for             breakpoints to be valid and whether to create rank weighted (characteristic managed)                  portfolios in each of the 5 size groups. Default settings are the same as used in Jensen,             Kelly and Pedersen (2021).
+	5. The variable `chars` controls which characteristics to use for creating factor returns. By default, it is set to the 153 characteristics from Jensen, Kelly and Pedersen (2022). Any             column in the charactersitic dataset can be used to as the basis of a factor. 
+	6. The variable `settings` controls the end date, number of portfolio, which breakpoints to use, the data source, whether to winsorize Compustat returns, the minimum amount of stocks for             breakpoints to be valid and whether to create rank weighted (characteristic managed)                  portfolios in each of the 5 size groups. Default settings are the same as used in Jensen,             Kelly and Pedersen (2022).
  6. Run `portfolio.R`.
 
 ### Output
 **Files**
 - `pfs.csv`: We sort stocks into 3 portfolios based on non-microcap breakpoints. Portfolio 1 (3) has the stocks with the lowest (highest) value of the characteristic.
 - `hml.csv`: Long/short portfolios that are long stocks with high values of the underlying characteristics (portfolio 3 from pfs.csv) and short stocks with low values (portfolio 1 from pfs.csv). 
-- `lms.csv`: Long/short portfolios based on hml.csv but with the signing convention used in Jensen, Kelly and Pedersen (2021). In particular, we sign factors so they are consistent with the literature. For example, we go long low asset growth stocks and short high asset growth stocks, becuase the literature generally finds that low asset growth stocks outperform. 
+- `lms.csv`: Long/short portfolios based on hml.csv but with the signing convention used in Jensen, Kelly and Pedersen (2022). In particular, we sign factors so they are consistent with the literature. For example, we go long low asset growth stocks and short high asset growth stocks, becuase the literature generally finds that low asset growth stocks outperform. 
 - `cmp.csv`: Rank-weighted (chracteristic managed) portfolios within mega, large, small, micro and nano cap stocks in the US.
 - `market_returns.csv`: Monthly market returns in all the countries we cover.
 - `Country Factors`: Folder with lms.csv in country-by-country files for easier usability. Countries are saved by their [ISO Alpha-3 codes](https://www.nationsonline.org/oneworld/country_code_list.htm).  
-- `Regional Factors`: Folder with regional factors based on lms.csv and the method in Jensen, Kelly and Pedersen (2021).   
+- `Regional Factors`: Folder with regional factors based on lms.csv and the method in Jensen, Kelly and Pedersen (2022).   
 
 **Variables**
 - `excntry`: Country where securities are listed as ISO Alpha-3 codes.
 - `eom`: End-of-month of the month used to calculate returns.
-- `characteristic`: Name of characteristic, refer to table J.1 in Jensen, Kelly and Pedersen (2021).
+- `characteristic`: Name of characteristic, refer to table J.1 in Jensen, Kelly and Pedersen (2022).
 - `region`: Region/MSCI country development of included factors. 
 - `size_grp`: Size group used to create the rank weighted factors.
 - `pf`: Portfolio identifier
@@ -59,7 +68,7 @@ The file `portfolio.R` generates country level factor returns based on the datas
 - `signal_weighted`: Rank weighted signal.
 - `ret_ew`: Return with equal weights.
 - `ret_vw`: Return with value weights.
-- `ret_vw_cap`: Return with capped value weights as used in Jensen, Kelly and Pedersen (2021).
+- `ret_vw_cap`: Return with capped value weights as used in Jensen, Kelly and Pedersen (2022).
 - `ret_weighted`: Rank weighted returns.
 - `me_lag1`: Total market equity within a country at the begining of the month
 - `dolvol_lag1`: Total dollar volume traded within a country in the previous month.
