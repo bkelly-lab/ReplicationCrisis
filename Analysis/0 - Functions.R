@@ -14,7 +14,7 @@ eb_prepare <- function(data, scale_alphas, overlapping) {
       beta = cov(ret, mkt_vw_exc)/var(mkt_vw_exc),
       ret_neu = (ret - mkt_vw_exc * beta)*100,
       scaling_fct = sqrt(10^2/12) / sd(ret_neu),
-      ret_neu_scaled = ret_neu * 10/(sd(ret_neu)*sqrt(12))
+      ret_neu_scaled = ret_neu * scaling_fct
     ) %>%
     ungroup()
   # Make Wide
