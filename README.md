@@ -1,5 +1,14 @@
 ## Overview
-This repository contains the code used for the paper [Is There a Replication Crisis in Finance?](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=3774514) by Jensen, Kelly and Pedersen (2021). Please cite this paper if you are using the code or data. Follow this [link](https://www.dropbox.com/sh/61j1v0sieq9z210/AACdJ68fs5_eT_eJMunwMBWia?dl=0) for a detailed documentation of the data sets.
+This repository contains the code used for the paper [Is There a Replication Crisis in Finance?](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=3774514) by Jensen, Kelly and Pedersen (2022). Please cite this paper if you are using the code or data:
+```
+@article{JensenKellyPedersen2022,
+   author = {Jensen, Theis Ingerslev and Kelly, Bryan T and Pedersen, Lasse Heje},
+   journal = {Journal of Finance, Forthcoming},
+   title = {Is There A Replication Crisis In Finance?},
+   year = {2022}
+}
+```
+Follow this [link](https://www.dropbox.com/sh/61j1v0sieq9z210/AACdJ68fs5_eT_eJMunwMBWia?dl=0) for a detailed documentation of the data sets.
 
 The code consists of the following two self-contained components:
 
