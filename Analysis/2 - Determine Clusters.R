@@ -77,7 +77,7 @@ if (settings$weighting$us == "vw_cap" & settings$hcl$k == 13 & settings$hcl$regi
         hcl == 9 ~ "Accruals",   
         hcl == 10 ~ "Profitability",
         hcl == 11 ~ "Profit Growth",
-        hcl == 12 ~ "Skewness",
+        hcl == 12 ~ "Short-Term Reversal",
         hcl == 13 ~ "Momentum",
         TRUE ~ as.character(hcl))
     ) 

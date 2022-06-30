@@ -1,5 +1,5 @@
 # Determine Cluster Order
-cluster_order <- c("Accruals", "Debt Issuance", "Investment", "Skewness", "Value",
+cluster_order <- c("Accruals", "Debt Issuance", "Investment", "Short-Term Reversal", "Value",
                    "Low Risk", "Quality", "Momentum", "Profitability", "Profit Growth",
                    "Seasonality", "Size", "Low Leverage")
 
@@ -27,7 +27,7 @@ output$figures$hcl_us <- function(tex = F) {
                y_shift = 11/2, horiz = T)
   # Labels
   if (settings$hcl$k == 13) {
-    text(x = x, y = 151, label_func("Skewness"), cex = c, col = colours_theme[5], adj = 0)   #gold-9
+    text(x = x, y = 151, label_func("Short-Term Reversal"), cex = c, col = colours_theme[5], adj = 0)   #gold-9
     text(x = x, y = 141, label_func("Profitability"), cex = c, col = colours_theme[4], adj = 0)  #lightgreen-7
     text(x = x, y = 129, label_func("Low Risk"), cex = c, col = colours_theme[3], adj = 0)  #purple-5
     text(x = x, y = 112, label_func("Value"), cex = c, col = colours_theme[2], adj = 0)       #orange-4
@@ -248,7 +248,7 @@ if (save_figures) {
   dev.off()
   
   # Hierarchical Clusters
-  output_fig(path=output_path, name = "us_hcl_pairwise_cor", format = format, width = w-4, height = h)
+  output_fig(path=output_path, name = "us_hcl_pairwise_cor", format = format, width = 6, height = 6)
   output$figures$hcl_us_val()
   dev.off()
   

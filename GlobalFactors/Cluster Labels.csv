@@ -55,9 +55,9 @@ gp_at,Quality
 gp_atl1,Quality
 inv_gr1,Investment
 inv_gr1a,Investment
-iskew_capm_21d,Skewness
-iskew_ff3_21d,Skewness
-iskew_hxz4_21d,Skewness
+iskew_capm_21d,Short-Term Reversal
+iskew_ff3_21d,Short-Term Reversal
+iskew_hxz4_21d,Short-Term Reversal
 ival_me,Value
 ivol_capm_21d,Low Risk
 ivol_capm_252d,Low Risk
@@ -112,7 +112,7 @@ rd_sale,Low Leverage
 rd5_at,Low Leverage
 resff3_12_1,Momentum
 resff3_6_1,Momentum
-ret_1_0,Skewness
+ret_1_0,Short-Term Reversal
 ret_12_1,Momentum
 ret_12_7,Profit Growth
 ret_3_1,Momentum
@@ -121,8 +121,8 @@ ret_60_12,Investment
 ret_9_1,Momentum
 rmax1_21d,Low Risk
 rmax5_21d,Low Risk
-rmax5_rvol_21d,Skewness
-rskew_21d,Skewness
+rmax5_rvol_21d,Short-Term Reversal
+rskew_21d,Short-Term Reversal
 rvol_21d,Low Risk
 sale_bev,Quality
 sale_emp_gr1,Profit Growth

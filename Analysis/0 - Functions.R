@@ -2134,7 +2134,7 @@ plot_size_overall <- function(eb_size, flipped = F, text = F) {
       labs(y = "Replication Rate (%)") +
       theme(axis.title.y = element_blank())
     if (text) {
-      size_plot <- size_plot + geom_text(aes(label = str_c(formatC(round(repl_rate * 100, 1), digits = 1, format = "f"), "%")), nudge_y = 7, size = 4)
+      size_plot <- size_plot + geom_text(aes(label = str_c(formatC(round(repl_rate * 100, 1), digits = 1, format = "f"), "%")), nudge_y = 7, size = 5.5)
     }
   } else {
     size_plot <- size_repl %>%
