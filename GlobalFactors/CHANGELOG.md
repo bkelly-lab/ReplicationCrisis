@@ -1,7 +1,15 @@
 # CHANGELOG.md
 This change log keeps track of changes to the underlying data set. In brackets, we highlight versions of importance. The version with _factor data set_ is the basis of the factor portfolios we upload at [https://jkpfactors.com/](https://jkpfactors.com/). The version with _paper data set_ is the the basis of the current version of [Jensen, Kelly and Pedersen (2021)](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=3774514).
 
-## 08-02-2022 [Paper data set] [Factor data set]
+## 30-06-2022 [Paper data set] [Factor data set]
+
+__Changes__:
+- Changed name of "Skewness" cluster to "Short-Term Reversal"
+
+__Impact__:
+- Replication rate: 82.4%. 
+
+## 08-02-2022 
 
 __Changes__:
 - Fix error in the construction of intrinsic_value. Previously, we failed to scale intrinsic_value by market equity as done in Frankel and Lee (1998). We call the new characteristic ival_me and keep intrinsic_value in the data set. The alpha of the new factor based on ival_me is significantly different from zero, while the factor based on intrinsic_value is insignificant.
