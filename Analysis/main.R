@@ -40,7 +40,7 @@ update_harvey_worstcase <- T
 settings <- list(
   seed = 1,
   start_date = as.Date("1925-12-31"),     
-  end_date = as.Date("2020-12-31"),       # Important that end_date <= Last_CRSP_UPDATE
+  end_date = as.Date("2022-12-31"),       # Important that end_date <= Last_CRSP_UPDATE
   country_excl = c("ZWE", "VEN"),         # Countries are excluded due to data issues
   weighting =  list(                      # Which weighting scheme to use? In c("ew", "vw", "vw_cap")
     us = 'vw_cap',
