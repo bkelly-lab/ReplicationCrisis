@@ -1279,7 +1279,7 @@ Importantly, a given company (gvkey) can potentially have up to 3 primary securi
 %macro save_daily_ret_csv(out=, data=, path=);
 	data daily; 
 		set &data.;
-		keep excntry id source_crsp date ret_exc; 
+		keep excntry id date me ret ret_exc; 
 	run;
 	proc sql noprint;
 		select distinct lowcase(excntry) into :countries separated by ' '
@@ -1329,7 +1329,7 @@ Importantly, a given company (gvkey) can potentially have up to 3 primary securi
 %macro save_monthly_ret_csv(out=, data=, path=);
 	data monthly; 
 		set &data.;
-		keep excntry id source_crsp eom ret_exc ret ret_local; 
+		keep excntry id source_crsp eom me ret_exc ret ret_local; 
 	run;
 	proc export data=monthly
 	    outfile="&path./world_ret_monthly.csv"   

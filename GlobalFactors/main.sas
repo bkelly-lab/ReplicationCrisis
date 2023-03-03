@@ -12,7 +12,7 @@ proc delete data = _all_ ; run ;
 %let save_csv = 1;     * Should the main data set be save country-by-country in a .csv format?;
 %let save_daily_ret = 1;   * Save daily stocks returns country-by-country in a .csv format?;
 %let save_monthly_ret = 1;   * Save monthly stocks returns  in a .csv format;
-%let end_date = '31DEC2021'd; * Date of last observation: CRSP data is only updated annually, so we keep this updating frequency for consistency. Should be incremented every time there's an update to the CRSP database);
+%let end_date = '31DEC2022'd; * Date of last observation: CRSP data is only updated annually, so we keep this updating frequency for consistency. Should be incremented every time there's an update to the CRSP database);
 
 ***************************************************************************
 * Libraries and Functions

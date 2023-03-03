@@ -65,7 +65,7 @@ chars <- c(
 )
 # Portfolio settings
 settings <- list(
-  end_date = as.Date("2021-12-31"),
+  end_date = as.Date("2022-12-31"),
   pfs = 3,
   source = c("CRSP", "COMPUSTAT"),                           
   wins_ret = T,
@@ -114,7 +114,7 @@ portfolios <- function(
   ret_cutoffs_daily = NULL               # Data frame for daily winsorization. Neccesary when wins_ret=T and daily_pf=T
 ) {
   # Characteristic Data
-  data <- fread(paste0(data_path, "/Characteristics/", excntry, ".csv"), select = c("excntry", "id", "eom", "source_crsp", "comp_exchg", "crsp_exchcd", "size_grp", "ret_exc", "ret_exc_lead1m", "me", "gics", "ff49", chars), colClasses = c("eom"="character"))
+  data <- fread(paste0(data_path, "/Characteristics/", excntry, ".csv"), select = c("id", "eom", "source_crsp", "comp_exchg", "crsp_exchcd", "size_grp", "ret_exc", "ret_exc_lead1m", "me", "gics", "ff49", chars), colClasses = c("eom"="character"))
   data[, eom := eom %>% lubridate::fast_strptime(format = "%Y%m%d") %>% as.Date()]
   # ME CAP
   data <- nyse_size_cutoffs[, .(eom, nyse_p80)][data, on = "eom"]
@@ -131,7 +131,7 @@ portfolios <- function(
   data <- data[!is.na(size_grp) & !is.na(me) & !is.na(ret_exc_lead1m)] # The ret_exc_lead1m screen assumes that investor knew at the beginning of the month that the security would delist. 
   # Daily Returns
   if (daily_pf) {
-    daily <- fread(paste0(data_path, "/Daily Returns/", excntry, ".csv"), colClasses = c("date"="character"))
+    daily <- fread(paste0(data_path, "/Daily Returns/", excntry, ".csv"), colClasses = c("date"="character"), select = c("id", "date", "ret_exc")); gc()
     daily[, date := date %>% lubridate::fast_strptime(format = "%Y%m%d") %>% as.Date()]
     daily[, eom_lag1 := floor_date(date, unit="month")-1]
   }
@@ -145,9 +145,9 @@ portfolios <- function(
       daily[, year := year(date)]
       daily[, month := month(date)]
       daily <- ret_cutoffs_daily[, .(year, month, "p001"=ret_exc_0_1, "p999"=ret_exc_99_9)][daily, on = .(year, month)]
-      daily[source_crsp == 0 & ret_exc > p999, ret_exc := p999]
-      daily[source_crsp == 0 & ret_exc < p001, ret_exc := p001]
-      daily[, c("source_crsp", "p001", "p999", "year", "month") := NULL]
+      daily[id>99999 & ret_exc > p999, ret_exc := p999] # Only winsorize Compustat data, id for CRSP is 5 digits, Compustat is 9: source_crsp == 0 
+      daily[id>99999 & ret_exc < p001, ret_exc := p001]
+      daily[, c("p001", "p999", "year", "month") := NULL]
     }
   }
   # Standardize to [-0.5, +0.5] interval (for signals)
@@ -158,8 +158,7 @@ portfolios <- function(
   }
   # Industry Portfolios 
   if (ind_pf) {
-    ind_data <- data[, c("eom", "gics", "excntry", "ret_exc_lead1m", "me", "me_cap")]
-    ind_data <- ind_data[!is.na(gics)]
+    ind_data <- data[!is.na(gics), .(eom, gics, excntry, ret_exc_lead1m, me, me_cap)]
     # Get first 2 digits of GICS code for industry groups
     ind_data[, gics := as.numeric(substr(ind_data$gics, 1, 2))]
     ind_gics <- ind_data[, .(
@@ -173,8 +172,7 @@ portfolios <- function(
     ind_gics <- ind_gics[n >= bp_min_n]
     # Estimate industry portfolios by Fama-French portfolios for US data
     if (excntry == "usa"){
-      ind_data <- data[, c("eom", "ff49", "excntry", "ret_exc_lead1m", "me", "me_cap")]
-      ind_data <- ind_data[!is.na(ff49)]
+      ind_data <- data[!is.na(ff49), .(eom, ff49, ret_exc_lead1m, me, me_cap)]
       ind_ff49 <- ind_data[, .(
         n = .N,
         ret_ew = mean(ret_exc_lead1m),
@@ -264,7 +262,7 @@ portfolios <- function(
   if (ind_pf) {
     output$gics_returns <- ind_gics
     if (excntry == "usa") {
-      output$ff49_returns <- ind_ff49
+      output$ff49_returns <- copy(ind_ff49)
     }
   }
   if (nrow(output$pf_returns) != 0) {
