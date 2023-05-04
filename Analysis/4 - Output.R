@@ -65,7 +65,7 @@ output$figures$gl_by_factor <- eb_est$world %>% plot_factor_post(orig_sig = T, c
 # CI Many Factors
 output$figures$ci_many_fcts <- plot_many_factors()
 
-# Tangency Portfolio - World
+# Tangency Portfolio - US
 output$figures$tpf <- tpf_us %>% plot_tpf(cluster_order = cluster_order, ci_low = 0.05, ci_high = 0.95)
 
 # Tangency Portfolio - Regions
@@ -75,10 +75,12 @@ output$figures$tpf_regions <- plot_tpf_region(tpf_us = tpf_us, tpf_dev = tpf_dev
 output$figures$tpf_size <- tpf_size %>% plot_tpf_size(cluster_order = cluster_order, ci_low = 0.05, ci_high = 0.95)
 
 # Posterior over Time - Fixed Taus
-output$figures$overtime <- posterior_over_time %>% plot_over_time(orig_sig = T, ols_incl = T, lb = 5)
+output$figures$overtime <- posterior_over_time %>% plot_over_time(orig_sig = T, ols_incl = T, lb = 5, bw=F)
+output$figures$overtime_bw <- posterior_over_time %>% plot_over_time(orig_sig = T, ols_incl = T, lb = 5, bw=T)
 
 # Posterior over Time - Flexible Taus
-output$figures$overtime_flex <- posterior_over_time_flex %>% plot_over_time(orig_sig = T, ols_incl = F, lb=5)
+output$figures$overtime_flex <- posterior_over_time_flex %>% plot_over_time(orig_sig = T, ols_incl = F, lb=5, bw=F)
+output$figures$overtime_flex_bw <- posterior_over_time_flex %>% plot_over_time(orig_sig = T, ols_incl = F, lb=5, bw=T)
 
 # Posterior over Time - Flexible Taus - Plot taus
 output$figures$overtime_flex_taus <- posterior_over_time_flex %>% plot_taus_over_time() 
@@ -135,286 +137,398 @@ output$figures$eb_sig_oos <- sig_oos_pfs %>% plot_sig_oos(sig_type = "eb_sig", c
 
 # Save Figures as Pictures -------------------------
 if (save_figures) {
+  # Base settings
   output_fig <- function(path, name, format, width, height) {
-    path <- paste0(path, "/", name)   # <- change path as desired 
-    if (format == "tex") {
-      tikz(str_c(path, ".tex"), width = width, height = height) 
-    }
-    if (format == "pdf") {
-      pdf(str_c(path, ".pdf"), width = width, height = height)
-    }
-    if (format == "jpg") {
-      w_pix <- width / (2.54 / 96 / 2.54)
-      h_pix <- height / (2.54 / 96 / 2.54)
-      jpeg(str_c(path, ".jpg"), width = w_pix, height = h_pix)
-    }
-    if (format == "eps") {
-      cairo_ps(filename = str_c(path, ".eps"),
-               width = width, height = height)
-    }
-    if (format == "tiff") {
-      tiff(filename = str_c(path, ".tiff"), units="in", width=width, height=height, res=500)
-    }
+    file <- paste0(path, "/", name, ".eps")
+    ggsave(file=file, width = width, height = height, units = "in", dpi = 300)
   }
-  # For Paper -----------------------------------------
+  
   h <- 5
   w <- 9
-  format <- "pdf"
-  
-  # Figure 1
-  output_fig(path=output_path, name = "lit_comp", format = format, width = w + 1, height = h)
-  output$figures$lit_comp 
+  # For main text -----------------------------------------
+  # Figure 1 ------
+  output$figures$lit_comp
+  output_fig(path=output_path, name = "fig1", width = w + 1, height = h)
   dev.off()
   
-  # MT - Factors
-  output_fig(path=output_path, name = "mt_factors", format = format, width = w, height = h)
+  output$figures$lit_comp + scale_fill_manual(values = c("black", "grey35"))
+  output_fig(path=output_path, name = "fig1_bw", width = w + 1, height = h)
+  dev.off()
+  
+  # Figure 2 -----
+  output$figures$marg_sig_oos
+  output_fig(path=output_path, name = "fig2", width = w, height = h*2/3)
+  dev.off()
+  
+  output$figures$marg_sig_oos + scale_colour_manual(values = c("black", "black"))
+  output_fig(path=output_path, name = "fig2_bw", width = w, height = h*2/3)
+  dev.off()
+  
+  # Figure 3 -----
+  output$figures$sim_fdr
+  output_fig(path=output_path, name = "fig3", format = format, width = w, height = h)
+  dev.off()
+  
+  output$figures$sim_fdr + scale_colour_manual(values = c("black", "black", "black"))
+  output_fig(path=output_path, name = "fig3_bw", format = format, width = w, height = h)
+  dev.off()
+  
+  
+  # Figure 4 -----
   output$figures$mt_factors + theme(text = element_text(size = 13), axis.text.x = element_blank())
+  output_fig(path=output_path, name = "fig4", format = format, width = w, height = h)
   dev.off()
   
-  # CI's 
-  output_fig(path=output_path, name = "ci_many_fcts", format = format, width = w, height = h)
-  output$figures$ci_many_fcts + theme(axis.text.y = element_text(size = 13), text = element_text(size = 13))
+  output$figures$mt_factors + theme(text = element_text(size = 13), axis.text.x = element_blank()) + 
+    scale_colour_manual(values = rep("black", 3))
+  output_fig(path=output_path, name = "fig4_bw", format = format, width = w, height = h)
   dev.off()
   
-  # MT - Summary
-  output_fig(path=output_path, name = "mt_summary", format = format, width = w, height = h)
+  # Figure 5a -----
+  output$figures$size_overall + theme(
+    axis.title.x = element_text(size = 17),
+    axis.text.x = element_text(size = 17),
+    axis.text.y = element_text(size = 17))
+  output_fig(path=output_path, name = "fig5a", format = format, width = w, height = h)
+  dev.off()
+  
+  output$figures$size_overall + theme(
+    axis.title.x = element_text(size = 17),
+    axis.text.x = element_text(size = 17),
+    axis.text.y = element_text(size = 17)) + geom_col(fill="grey35")
+  output_fig(path=output_path, name = "fig5a_bw", format = format, width = w, height = h)
+  dev.off()
+  
+  # Figure 5b -----
+  output$figures$repl_cluster_us + theme(
+    axis.text.y = element_text(size = 13), 
+    axis.text.x = element_text(size = 14), 
+    text = element_text(size = 14))
+  output_fig(path=output_path, name = "fig5b", format = format, width = w, height = h)
+  dev.off()
+  
+  output$figures$repl_cluster_us + theme(
+    axis.text.y = element_text(size = 13), 
+    axis.text.x = element_text(size = 14), 
+    text = element_text(size = 14)) + scale_fill_manual(values = rep("grey35", 13))
+  output_fig(path=output_path, name = "fig5b_bw", format = format, width = w, height = h)
+  dev.off()
+  
+  # Figure 6 -----
   output$figures$mt_summary + 
     theme(
       text = element_text(size = 13),
       axis.title.x = element_blank(), 
       axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1, size = 9)
     )
+  output_fig(path=output_path, name = "fig6", format = format, width = w, height = h)
   dev.off()
   
-  # Global Factors - Factors
-  output_fig(path=output_path, name = "gl_by_factor", format = format, width = w, height = h)
-  output$figures$gl_by_factor + theme(text = element_text(size = 13), legend.position = "right", axis.text.x = element_text(size = 5)) 
+  output$figures$mt_summary + 
+    theme(
+      text = element_text(size = 13),
+      axis.title.x = element_blank(), 
+      axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1, size = 9)
+    ) +
+    scale_fill_grey()
+  output_fig(path=output_path, name = "fig6_bw", format = format, width = w, height = h)
   dev.off()
   
-  # Global Factors - Clusters
-  output_fig(path=output_path, name = "gl_by_cluster", format = format, width = w, height = h)
-  output$figures$gl_by_cluster  + theme(text = element_text(size = 13))
-  dev.off()
-  
-  # Tangency Portfolio - World
-  output_fig(path=output_path, name = "tpf", format = format, width = w, height = h)
-  output$figures$tpf  + theme(text = element_text(size = 13), axis.text.x = element_text(size = 13), axis.text.y = element_text(size = 13))
-  dev.off()
-  
-  # Tangency Portfolio - Regions
-  output_fig(path=output_path, name = "tpf_regions", format = format, width = w, height = h)
-  output$figures$tpf_regions  + theme(text = element_text(size = 13), axis.text.x = element_text(size = 13), axis.text.y = element_text(size = 13))
-  dev.off()
-  
-  # Tangency Portfolio - Size Groups
-  output_fig(path=output_path, name = "tpf_size", format = format, width = w, height = h)
-  output$figures$tpf_size  + theme(
-    text = element_text(size = 13), 
-    axis.text.x = element_text(size = 13), 
-    axis.text.y = element_text(size = 11))
-  dev.off()
-  
-  # Evidence over time - Fixed Taus
-  output_fig(path=output_path, name = "over_time", format = format, width = w, height = h)
-  output$figures$overtime
-  dev.off()
-  
-  # Evidence over time - Flexible Taus
-  output_fig(path=output_path, name = "over_time_flex", format = format, width = w, height = h)
-  output$figures$overtime_flex + theme(text = element_text(size = 13))
-  dev.off()
-  
-  # Evidence over time - Flexible Taus - Taus
-  output_fig(path=output_path, name = "over_time_flex_taus", format = format, width = w, height = h)
-  output$figures$overtime_flex_taus + theme(text = element_text(size = 13), legend.text = element_text(size = 12))
-  dev.off()
-  
-  # Size - Overall
-  output_fig(path=output_path, name = "size_overall", format = format, width = w, height = h)
-  output$figures$size_overall + theme(
-    axis.title.x = element_text(size = 17),
-    axis.text.x = element_text(size = 17),
-    axis.text.y = element_text(size = 17))
-  dev.off()
-  
-  # Size - Clusters
-  output_fig(path=output_path, name = "size_clusters", format = format, width = w, height = h+1)
-  output$figures$size_clusters
-  dev.off()
-  
-  # Hierarchy
-  output_fig(path=output_path, name = "us_hcl", format = format, width = w, height = h*2+1.5)
-  output$figures$hcl_us()
-  dev.off()
-  
-  # Hierarchical Clusters
-  output_fig(path=output_path, name = "us_hcl_pairwise_cor", format = format, width = 6, height = 6)
-  output$figures$hcl_us_val()
-  dev.off()
-  
-  # Model FDR
-  output_fig(path=output_path, name = "model_fdr", format = format, width = w, height = h)
-  output$figures$model_fdr + theme(text = element_text(size = 13))
-  dev.off()
-  
-  # Simulated FDR
-  output_fig(path=output_path, name = "sim_fdr", format = format, width = w, height = h)
-  output$figures$sim_fdr
-  dev.off()
-  
-  # World vs. US
-  output_fig(path=output_path, name = "world_vs_us", format = format, width = h, height = h)
+  # Figure 7 -----
   output$figures$world_vs_us + theme(text = element_text(size = 13)) 
+  output_fig(path=output_path, name = "fig7", format = format, width = h, height = h)
   dev.off()
   
-  # IS VS. OOS ---------------
-  
-  # IS vs. pre/post
-  output_fig(path=output_path, name = "is_pre_post", format = format, width = w/3, height = w/3)
-  output$figures$is_oos  + theme(
-    text = element_text(size = 12), 
-    plot.title = element_text(size = 10, vjust = -2), 
-    plot.subtitle = element_text(size = 8, vjust = 0),
-    plot.margin = unit(c(0,0,0,0), "cm")
-  ) 
+  output$figures$world_vs_us + theme(text = element_text(size = 13)) + scale_colour_manual(values = c("black", "grey35"))
+  output_fig(path=output_path, name = "fig7_bw", format = format, width = h, height = h)
   dev.off()
   
-  # IS vs. post
-  output_fig(path=output_path, name = "is_post", format = format, width = w/3, height = w/3)
-  output$figures$is_post  + theme(
-    text = element_text(size = 12), 
-    plot.title = element_text(size = 10, vjust = -2), 
-    plot.subtitle = element_text(size = 8, vjust = 0),
-    plot.margin = unit(c(0,0,0,0), "cm")
-  )  
-  dev.off()
-  
-  # IS vs. Pre
-  output_fig(path=output_path, name = "is_pre", format = format, width = w/3, height = w/3)
+  # Figure 8a -----
   output$figures$is_pre + theme(
     text = element_text(size = 12), 
     plot.title = element_text(size = 10, vjust = -2), 
     plot.subtitle = element_text(size = 8, vjust = 0),
     plot.margin = unit(c(0,0,0,0), "cm")
   ) 
+  output_fig(path=output_path, name = "fig8a", format = format, width = w/3, height = w/3)
   dev.off()
   
-  # IS VS. OOS: Quadratic ---------------
+  output$figures$is_pre + theme(
+    text = element_text(size = 12), 
+    plot.title = element_text(size = 10, vjust = -2), 
+    plot.subtitle = element_text(size = 8, vjust = 0),
+    plot.margin = unit(c(0,0,0,0), "cm")
+  )  + geom_point(colour = "black")
+  output_fig(path=output_path, name = "fig8a_bw", format = format, width = w/3, height = w/3)
+  dev.off()
   
-  # IS vs. pre/post
-  output_fig(path=output_path, name = "is_pre_post_quad", format = format, width = w/3, height = w/3)
-  output$figures$is_oos_quad  + theme(
+  # Figure 8b -----
+  output$figures$is_post  + theme(
     text = element_text(size = 12), 
     plot.title = element_text(size = 10, vjust = -2), 
     plot.subtitle = element_text(size = 8, vjust = 0),
     plot.margin = unit(c(0,0,0,0), "cm")
   ) 
+  output_fig(path=output_path, name = "fig8b", format = format, width = w/3, height = w/3)
   dev.off()
   
-  # IS vs. post
-  output_fig(path=output_path, name = "is_post_quad", format = format, width = w/3, height = w/3)
-  output$figures$is_post_quad  + theme(
+  output$figures$is_post  + theme(
     text = element_text(size = 12), 
     plot.title = element_text(size = 10, vjust = -2), 
     plot.subtitle = element_text(size = 8, vjust = 0),
     plot.margin = unit(c(0,0,0,0), "cm")
-  )  
+  ) + geom_point(colour = "black")
+  output_fig(path=output_path, name = "fig8b_bw", format = format, width = w/3, height = w/3)
   dev.off()
   
-  # IS vs. Pre
-  output_fig(path=output_path, name = "is_pre_quad", format = format, width = w/3, height = w/3)
-  output$figures$is_pre_quad + theme(
+  # Figure 8c -----
+  output$figures$is_oos  + theme(
     text = element_text(size = 12), 
     plot.title = element_text(size = 10, vjust = -2), 
     plot.subtitle = element_text(size = 8, vjust = 0),
     plot.margin = unit(c(0,0,0,0), "cm")
   ) 
+  output_fig(path=output_path, name = "fig8c", format = format, width = w/3, height = w/3)
   dev.off()
   
-  # Effect Size - Region
-  output_fig(path=output_path, name = "effect_regions", format = format, width = w, height = h)
+  output$figures$is_oos  + theme(
+    text = element_text(size = 12), 
+    plot.title = element_text(size = 10, vjust = -2), 
+    plot.subtitle = element_text(size = 8, vjust = 0),
+    plot.margin = unit(c(0,0,0,0), "cm")
+  )  + geom_point(colour = "black")
+  output_fig(path=output_path, name = "fig8c_bw", format = format, width = w/3, height = w/3)
+  dev.off()
+  
+  # Figure 9 -----
+  output$figures$overtime
+  output_fig(path=output_path, name = "fig9", format = format, width = w, height = h)
+  dev.off()
+  
+  output$figures$overtime_bw
+  output_fig(path=output_path, name = "fig9_bw", format = format, width = w, height = h)
+  dev.off()
+  
+  
+  # Figure 10 -----
+  output$figures$sim_harvey + theme(
+    text = element_text(size = 12),
+    axis.text.x = element_text(size = 11),
+    axis.text.y = element_text(size = 11),
+    legend.text = element_text(size = 11)
+  )
+  output_fig(path=output_path, name = "fig10", format = format, width = w, height = h)
+  dev.off()
+  
+  output$figures$sim_harvey + theme(
+    text = element_text(size = 12),
+    axis.text.x = element_text(size = 11),
+    axis.text.y = element_text(size = 11),
+    legend.text = element_text(size = 11)
+  ) + scale_colour_manual(values = rep("black", 3))
+  output_fig(path=output_path, name = "fig10_bw", format = format, width = w, height = h)
+  dev.off()
+  
+  # Figure 11 -----
+  output$figures$gl_by_factor + theme(text = element_text(size = 13), legend.position = "right", axis.text.x = element_text(size = 5)) 
+  output_fig(path=output_path, name = "fig11", format = format, width = w, height = h)
+  dev.off()
+  
+  output$figures$gl_by_factor + theme(text = element_text(size = 13), legend.position = "right", axis.text.x = element_text(size = 5)) +
+    scale_colour_manual(values = rep("black", 13))
+  output_fig(path=output_path, name = "fig11_bw", format = format, width = w, height = h)
+  dev.off()
+  
+  
+  # Figure 12 -----
+  output$figures$effect_size + theme(
+    axis.text.y = element_text(size = 13), 
+    strip.text.x = element_text(size = 14),
+    axis.text.x = element_text(size = 12),
+    axis.title.x = element_text(size = 13)
+  )
+  output_fig(path=output_path, name = "fig12a", format = format, width = w, height = h)
+  dev.off()
+  
+  output$figures$effect_size + theme(
+    axis.text.y = element_text(size = 13), 
+    strip.text.x = element_text(size = 14),
+    axis.text.x = element_text(size = 12),
+    axis.title.x = element_text(size = 13)
+  ) + scale_fill_manual(values = rep("grey35", 13))
+  output_fig(path=output_path, name = "fig12a_bw", format = format, width = w, height = h)
+  dev.off()
+  
+  # Figure 12b -----
   output$figures$effect_regions + theme(
     axis.text.y = element_text(size = 13), 
     strip.text.x = element_text(size = 13),
     axis.text.x = element_text(size = 12),
     axis.title.x = element_text(size = 13)
   )
+  output_fig(path=output_path, name = "fig12b", format = format, width = w, height = h)
   dev.off()
   
-  # Effect Size - Size Grps
-  output_fig(path=output_path, name = "effect_size", format = format, width = w, height = h)
-  output$figures$effect_size + theme(
+  output$figures$effect_regions + theme(
     axis.text.y = element_text(size = 13), 
-    strip.text.x = element_text(size = 14),
+    strip.text.x = element_text(size = 13),
     axis.text.x = element_text(size = 12),
     axis.title.x = element_text(size = 13)
-    )
+  ) + scale_fill_manual(values = rep("grey35", 13))
+  output_fig(path=output_path, name = "fig12b_bw", format = format, width = w, height = h)
   dev.off()
   
-  # Cluster Replication - US
-  output_fig(path=output_path, name = "repl_cluster_us", format = format, width = w, height = h)
-  output$figures$repl_cluster_us + theme(
-    axis.text.y = element_text(size = 13), 
-    axis.text.x = element_text(size = 14), 
-    text = element_text(size = 14))
+  # Figure 13 -----
+  output$figures$tpf + theme(text = element_text(size = 13), axis.text.x = element_text(size = 13), axis.text.y = element_text(size = 13))
+  output_fig(path=output_path, name = "fig13", format = format, width = w, height = h)
   dev.off()
   
-  # Harvey et al Simulation - Base tau_w
-  output_fig(path=output_path, name = "sim_harvey", format = format, width = w, height = h)
-  output$figures$sim_harvey + theme(
-    text = element_text(size = 13),
-    axis.text.x = element_text(size = 12),
-    axis.text.y = element_text(size = 12),
-    legend.text = element_text(size = 12)
-  )
+  output$figures$tpf + theme(text = element_text(size = 13), axis.text.x = element_text(size = 13), axis.text.y = element_text(size = 13)) +
+    scale_fill_manual(values = rep("grey35", 14))
+  output_fig(path=output_path, name = "fig13_bw", format = format, width = w, height = h)
   dev.off()
   
-  # Harvey et al Simulation - Multiple tau_w
-  output_fig(path=output_path, name = "sim_harvey_robustness", format = format, width = w, height = h)
+  # Figure 14 -----
+  # Evolution of TPF
+  output$figures$tpf_evolution
+  output_fig(path=output_path, name = "fig14", format = format, width = w, height = h*0.8)
+  dev.off()
+  
+  output$figures$tpf_evolution
+  output_fig(path=output_path, name = "fig14_bw", format = format, width = w, height = h*0.8)
+  dev.off()
+  
+  
+  # Figure IA.1 ----- # NEED TO DO!!
+  if (FALSE) {
+    # Need to run everything with settings$weighting$us = "vw" and settings$weighting$global_ex_us="vw"
+    output$figures$lit_comp
+    output_fig(path=output_path, name = "figIA1", format = format, width = w + 1, height = h)
+    dev.off()
+  }
+  
+  
+  # Figure IA.2 ------
+  output$figures$eb_sig_oos
+  output_fig(path=output_path, name = "figIA2", format = format, width = w, height = h*2/3)
+  dev.off()
+  
+  # Figure IA.3a -----
+  output$figures$is_pre_quad + theme(
+    text = element_text(size = 12), 
+    plot.title = element_text(size = 10, vjust = -2), 
+    plot.subtitle = element_text(size = 8, vjust = 0),
+    plot.margin = unit(c(0,0,0,0), "cm")
+  ) 
+  output_fig(path=output_path, name = "figIA3a", format = format, width = w/3, height = w/3)
+  dev.off()
+  
+  # Figure IA.3b -----
+  output$figures$is_post_quad  + theme(
+    text = element_text(size = 12), 
+    plot.title = element_text(size = 10, vjust = -2), 
+    plot.subtitle = element_text(size = 8, vjust = 0),
+    plot.margin = unit(c(0,0,0,0), "cm")
+  )  
+  output_fig(path=output_path, name = "figIA3b", format = format, width = w/3, height = w/3)
+  dev.off()
+  
+  # Figure IA.3c -----
+  output$figures$is_oos_quad  + theme(
+    text = element_text(size = 12), 
+    plot.title = element_text(size = 10, vjust = -2), 
+    plot.subtitle = element_text(size = 8, vjust = 0),
+    plot.margin = unit(c(0,0,0,0), "cm")
+  ) 
+  output_fig(path=output_path, name = "figIA3c", format = format, width = w/3, height = w/3)
+  dev.off()
+  
+  
+  # Figure IA.4 -----
+  output$figures$overtime_flex + theme(text = element_text(size = 13))
+  output_fig(path=output_path, name = "figIA4", format = format, width = w, height = h)
+  dev.off()
+  
+  # Figure IA.5 -----
+  output$figures$overtime_flex_taus + theme(text = element_text(size = 13), legend.text = element_text(size = 12))
+  output_fig(path=output_path, name = "figIA5", format = format, width = w, height = h)
+  dev.off()
+  
+  # Figure IA.6 ----
   output$figures$sim_harvey_robustness + theme(
-    text = element_text(size = 13),
+    text = element_text(size = 12),
     axis.text.x = element_text(size = 11),
-    axis.text.y = element_text(size = 12),
-    legend.text = element_text(size = 12)
+    axis.text.y = element_text(size = 11),
+    legend.text = element_text(size = 11)
   )
+  output_fig(path=output_path, name = "figIA6", format = format, width = w, height = h)
   dev.off()
   
-  # TPF Factor Portfolio (Section H)
-  # Cluster + market
-  output_fig(path=output_path, name = "cluster_plus_market", format = format, width = w, height = h)
+  # Figure IA.7 ----
+  output$figures$gl_by_cluster  + theme(text = element_text(size = 13))
+  output_fig(path=output_path, name = "figIA7", format = format, width = w, height = h)
+  dev.off()
+  
+  # Figure IA.8 ----
+  output$figures$size_clusters
+  output_fig(path=output_path, name = "figIA8", format = format, width = w, height = h+1)
+  dev.off()
+  
+  # Figure IA.9 ----
+  output$figures$tpf_regions  + theme(text = element_text(size = 13), axis.text.x = element_text(size = 13), axis.text.y = element_text(size = 13))
+  output_fig(path=output_path, name = "figIA9", format = format, width = w, height = h)
+  dev.off()
+  
+  # Figure IA.10 ----
+  output$figures$tpf_size  + theme(
+    text = element_text(size = 13), 
+    axis.text.x = element_text(size = 13), 
+    axis.text.y = element_text(size = 11))
+  
+  output_fig(path=output_path, name = "figIA10", format = format, width = w, height = h*1.5)
+  dev.off()
+  
+  # Figure IA.11 ----
   output$figures$tpf_factors_one_cluster
+  output_fig(path=output_path, name = "figIA11", format = format, width = w, height = h)
   dev.off()
-  # Cluster importance
-  output_fig(path=output_path, name = "excl_cluster", format = format, width = w, height = h)
+  
+  # Figure IA.12 ----
   output$figures$tpf_factors_excl_one
+  output_fig(path=output_path, name = "figIA12", format = format, width = w, height = h)
   dev.off()
-  # Factor Importance
-  output_fig(path=output_path, name = "factor_tpf_imp", format = format, width = w, height = h*1.5)
-  output$figures$tpf_factors_imp + theme(
-    axis.text.y = element_text(size = 6)
-  )
-  dev.off()
-  # Factor Importance within Cluster
-  output_fig(path=output_path, name = "factor_tpf_imp_cluster", format = format, width = w, height = h*1.5)
+  
+  # Figure IA.13 ----
   output$figures$tpf_factors_imp_cluster + theme(
     axis.text.y = element_text(size = 6)
   )
-  dev.off()
-  # Evolution of TPF
-  output_fig(path=output_path, name = "tpf_evolution", format = format, width = w, height = h*0.8)
-  output$figures$tpf_evolution
+  output_fig(path=output_path, name = "figIA13", format = format, width = w, height = h*1.5)
   dev.off()
   
-  # Cumulative OOS Return - Marginally significant factors
-  output_fig(path=output_path, name = "marg_sig_oos", format = format, width = w, height = h*2/3)
-  output$figures$marg_sig_oos
+  # Figure IA.14 ----
+  output$figures$tpf_factors_imp + theme(
+    axis.text.y = element_text(size = 6)
+  )
+  output_fig(path=output_path, name = "figIA14", format = format, width = w, height = h*1.5)
   dev.off()
   
-  # Cumulative OOS Return - EB significant factors
-  output_fig(path=output_path, name = "eb_sig_oos", format = format, width = w, height = h*2/3)
-  output$figures$eb_sig_oos
+  # Figure IA.15 (special, because not ggplot) ----
+  pdf(str_c(output_path, "/figIA15.pdf"), width = w, height = h*2+1.5)
+  output$figures$hcl_us()
   dev.off()
   
+  # Figure IA.16 (special, because not ggplot) ----
+  pdf(str_c(output_path, "/figIA16.pdf"), width = 6, height = 6)
+  output$figures$hcl_us_val()
+  dev.off()
+  
+  
+  
+  
+  # Other figures not included in paper --------
+  output$figures$ci_many_fcts + theme(axis.text.y = element_text(size = 13), text = element_text(size = 13))
+  output$figures$model_fdr + theme(text = element_text(size = 13))
+
   # TABLES -----------------
   # Estimated Taus
   table_taus()

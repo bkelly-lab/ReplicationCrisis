@@ -1,3 +1,4 @@
+library(cowplot)
 library(directlabels)
 library(xtable)
 library(zeallot)
@@ -99,6 +100,9 @@ scale_colour_discrete <- function(...) {
 }
 scale_fill_discrete <- function(...) {
   scale_fill_manual(..., values = colours_theme)
+}
+scale_linetype_discrete <- function(...) {
+  scale_linetype_manual(..., values = c("solid", "longdash", "dotted", "dashed", "dotdash", "twodash"))
 }
 
 # Run Scripts ----------

@@ -573,7 +573,7 @@ bootstrap_tpf <- function(data, n_boots = 100, shorting = T, seed = 1) {
     boot_func <- function(splits, ...) {
       df <- analysis(splits) %>% apply(2, function(x) x / sd(x)) %>% as.data.frame()
       lm(rep(1, nrow(df)) ~ -1 + ., data = df) %>% 
-        tidy() %>% 
+        broom::tidy() %>% 
         mutate(weight = estimate / sum(estimate)) %>% 
         mutate(term = term %>% str_remove_all("`")) %>%
         select(term, weight)
@@ -583,7 +583,7 @@ bootstrap_tpf <- function(data, n_boots = 100, shorting = T, seed = 1) {
       df <- analysis(splits) %>% apply(2, function(x) x / sd(x))
       glmnet::glmnet(y = rep(1, nrow(df)), x = df %>% as.matrix(), 
                      lambda = 0, lower.limits = 0, intercept = F) %>% 
-        tidy(return_zeros = T) %>% 
+        broom::tidy(return_zeros = T) %>% 
         filter(term != "(Intercept)") %>% 
         mutate(weight = estimate / sum(estimate)) %>%
         select(term, weight)
@@ -1340,7 +1340,7 @@ plot_mt_eb_comp <- function(mt, eb_all, eb_us = NULL, eb_developed = NULL, eb_em
       ols_rank = frank(sort_var),
       repl_rate = sum(type == "Replicated") / sum(type %in% c("Replicated", "Not Replicated"))
     ) %>%
-    ggplot(aes(reorder(ols_rank, sort_var), estimate, colour = type)) +
+    ggplot(aes(reorder(ols_rank, sort_var), estimate, colour = type, linetype = type)) +
     geom_point() +
     geom_text(aes(x = 35, y = 1.45, label = str_c("Replication Rate: ", formatC(round(repl_rate*100, 1), digits = 1, format = "f"), "%")), 
               colour = "black", size = 3, check_overlap = T) +
@@ -1348,7 +1348,8 @@ plot_mt_eb_comp <- function(mt, eb_all, eb_us = NULL, eb_developed = NULL, eb_em
     facet_wrap(~method_pretty, ncol = length(se_methods) / 2) + 
     coord_cartesian(ylim = c(-1, 1.5)) +
     geom_hline(yintercept = 0, linetype = "dashed") +
-    labs(y = "Monthly Alpha (%)", colour = "Significant") +
+    guides(colour = guide_legend(override.aes = list(shape = NA))) + 
+    labs(y = "Monthly Alpha (%)") +
     theme(
       axis.title.x = element_blank(),
       axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1),
@@ -1391,11 +1392,12 @@ plot_factor_post <- function(eb, orig_sig, cluster_order) {
       sort_var = median(post_mean) + post_mean / 1000000
     ) %>%
     mutate(hcl_label = hcl_label %>% factor(levels = cluster_order)) %>%
-    ggplot(aes(reorder(characteristic, sort_var), post_mean, colour = hcl_label)) +
+    ggplot(aes(reorder(characteristic, sort_var), post_mean, colour = hcl_label, shape = hcl_label)) +
     geom_point() +
+    scale_shape_manual(values=1:13) +
     geom_errorbar(aes(ymin = post_mean - 1.96 * post_sd, ymax = post_mean + 1.96 * post_sd)) +
     geom_hline(yintercept = 0, linetype = "dashed") +
-    labs(y = "Monthly Alpha with 95% Confidence Interval (%)", colour = "Cluster") +
+    labs(y = "Monthly Alpha with 95% Confidence Interval (%)", colour = "Cluster", shape = "Cluster") +
     theme(
       axis.title.x = element_blank(),
       axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)
@@ -1506,8 +1508,8 @@ plot_lit_comp <- function(eb_us, mt_res, eb_world, excl_insig=T) {
   w <- 0.3  #use to set width of bars
   l1 <- -3
   inc <- -3 
-  col_top <- colours_theme[2]
-  col_bot <- colours_theme[1]
+  col_top <- "black" # colours_theme[2]
+  col_bot <- "black" # colours_theme[1]
   type <- litterature_comp$type
   plot <- litterature_comp %>%
     ggplot(aes(xmin = as.integer(type) - w, xmax = as.integer(type) + w, ymin = prev_repl_rate, ymax = repl_rate, fill = impact)) +
@@ -1519,8 +1521,9 @@ plot_lit_comp <- function(eb_us, mt_res, eb_world, excl_insig=T) {
     labs(x = "Implementation", y = "Replication Rate (%)") +
     coord_cartesian(ylim = c(0, 90), expand = FALSE, clip = "off") +
     # HXZ
-    annotate(geom = "text", x = "hxz", y = l1, label = "Hou et al. (2020):", colour = col_top, fontface = 2) +
-    annotate(geom = "text", x = "hxz", y = l1 + inc*1, label = "Raw returns", colour = col_bot, fontface = 1) +
+    annotate(geom = "text", x = "hxz", y = l1, label = "Hou, Xue, and", colour = col_top, fontface = 2) +
+    annotate(geom = "text", x = "hxz", y = l1 + inc*1, label = "Zhang (2020)", colour = col_top, fontface = 2) +
+    annotate(geom = "text", x = "hxz", y = l1 + inc*2, label = "Raw returns", colour = col_bot, fontface = 1) +
     # Our Raw
     annotate(geom = "text", x = "raw", y = l1, label = "Our sample", colour = col_top, fontface = 2) +
     annotate(geom = "text", x = "raw", y = l1 + inc*1, label = "Raw returns,", colour = col_bot) +
@@ -1529,9 +1532,10 @@ plot_lit_comp <- function(eb_us, mt_res, eb_world, excl_insig=T) {
     annotate(geom = "text", x = "alpha", y = l1, label = "Our sample", colour = col_top, fontface = 2) +
     annotate(geom = "text", x = "alpha", y = l1 + inc*1, label = "CAPM alphas", colour = col_bot) +
     # Our MT
-    annotate(geom = "text", x = "mt", y = l1, label = "Harvey et al. (2016)", colour = col_top, fontface = 2) +
-    annotate(geom = "text", x = "mt", y = l1 + inc*1, label = "Multiple testing", colour = col_bot) +
-    annotate(geom = "text", x = "mt", y = l1 + inc*2, label = "adjustment", colour = col_bot) +
+    annotate(geom = "text", x = "mt", y = l1, label = "Harvey, Liu, and", colour = col_top, fontface = 2) +
+    annotate(geom = "text", x = "mt", y = l1 + inc*1, label = "Zhu (2016)", colour = col_bot, fontface = 2) +
+    annotate(geom = "text", x = "mt", y = l1 + inc*2, label = "Multiple testing", colour = col_bot) +
+    annotate(geom = "text", x = "mt", y = l1 + inc*3, label = "adjustment", colour = col_bot) +
     # Our EB-US
     annotate(geom = "text", x = "eb_us", y = l1, label = "Our Bayesian", colour = col_top, fontface = 2) +
     annotate(geom = "text", x = "eb_us", y = l1 + inc*1, label = "estimation", colour = col_top, fontface = 2) +
@@ -1882,7 +1886,7 @@ plot_tpf_size <- function(tpf_size_samples, cluster_order, ci_low = 0.05, ci_hig
     facet_wrap(~size_grp_pretty, ncol = 1)
 }
 
-plot_over_time <- function(posterior_over_time, orig_sig, ols_incl, lb) {
+plot_over_time <- function(posterior_over_time, orig_sig, ols_incl, lb, bw) {
   if (orig_sig) {
     orig_sig_values <- T
   } else {
@@ -1907,6 +1911,15 @@ plot_over_time <- function(posterior_over_time, orig_sig, ols_incl, lb) {
     avg_ols <- mean(eb_act$factors$ols_est[i])
     tibble("end_date"= eb_act$end_date, n=n, post_mean, post_sd, avg_ols) 
   }) %>% bind_rows()
+  
+  # Black and white coloring
+  if (bw) {
+    col1 <- "black"
+    col2 <- "grey35"
+  } else {
+    col1 <- colours_theme[1]
+    col2 <- colours_theme[2]
+  }
   
   if (ols_incl) {
     # Create OLS benchmarks
@@ -1975,7 +1988,7 @@ plot_over_time <- function(posterior_over_time, orig_sig, ols_incl, lb) {
         geom_point(aes(y = post_mean, colour="Average Posterior Alpha", shape = "Average Posterior Alpha")) +
         geom_point(aes(y = avg_alpha_full, colour="Average OLS Alpha", shape = "Average OLS Alpha")) +
         geom_errorbar(aes(ymin = post_mean + 1.96 * post_sd, ymax = post_mean - 1.96 * post_sd)) +
-        scale_colour_manual(name = "Test", values = c("Average Posterior Alpha"=colours_theme[1], "Average OLS Alpha"=colours_theme[2])) +
+        scale_colour_manual(name = "Test", values = c("Average Posterior Alpha"=col1, "Average OLS Alpha"=col2)) +
         scale_shape_manual(name = "Test", values = c("Average Posterior Alpha" = 16, "Average OLS Alpha" = 17)) +
         labs(y = "Posterior Alpha with 95% CI (%)") +
         ylim(c(0, NA)) +
@@ -2003,7 +2016,7 @@ plot_over_time <- function(posterior_over_time, orig_sig, ols_incl, lb) {
   } else {
     plot <- full_posterior %>%
       ggplot(aes(end_date)) +
-      geom_point(aes(y = post_mean), colour=colours_theme[1], shape = 16) +
+      geom_point(aes(y = post_mean), colour=col1, shape = 16) +
       geom_errorbar(aes(ymin = post_mean + 1.96 * post_sd, ymax = post_mean - 1.96 * post_sd)) +
       labs(y = "Posterior Alpha with 95% CI (%)") +
       ylim(c(0, NA)) +
@@ -2031,8 +2044,9 @@ plot_taus_over_time <- function(posterior_over_time_flex) {
   ymax <- max(data$ml_est)
   
   data %>%
-    ggplot(aes(end_date, ml_est, colour = estimate_pretty)) +
+    ggplot(aes(end_date, ml_est, colour = estimate_pretty, linetype = estimate_pretty)) +
     geom_line() +
+    scale_linetype_manual(values = c('tau_c' = "solid", 'tau_w' = "longdash"), name = '', labels = c(expression(tau[c]), expression(tau[w]))) +
     scale_colour_manual(values = c('tau_c' = colours_theme[1], 'tau_w' = colours_theme[2]), name = '', labels = c(expression(tau[c]), expression(tau[w]))) +
     scale_x_date(breaks = seq.Date(as.Date("1960-12-31"), as.Date("2020-12-31"), by = "10 years"), date_labels = "%Y-%m") +
     labs(y = "Maximum Likelihood Estimate (%)") +
@@ -2100,12 +2114,12 @@ plot_sim_fdr <- function(simulation) {
     group_by(stat) %>%
     mutate(scale_max = max(number)) %>%
     mutate(scale_min = min(number)) %>%
-    ggplot(aes(tau_c, number, colour = type)) +
+    ggplot(aes(tau_c, number, colour = type, shape = type)) +
     geom_point() +
     geom_point(aes(y = scale_max), alpha = 0) +
     geom_point(aes(y = scale_min), alpha = 0) +
     geom_line() +
-    labs(x = bquote(bold(tau[c])~"(%)"), colour = "Type:") +
+    labs(x = bquote(bold(tau[c])~"(%)"), colour = "Type:", linetype = "Type:", shape = "Type:") +
     facet_wrap(stat_title~tau_w_title, scales = "free_y", labeller = label_parsed) +
     # facet_wrap(stat_title~tau_w_title) +
     # facet_wrap(stat~tau_w_title, scales = "free_y", labeller = label_bquote(tau[w] ~ "=" ~ .(tau_w_title)~ "%")) +
@@ -2678,11 +2692,11 @@ plot_harvey <- function(harvey_base_res, harvey_worst_res, tau_ws, act_rr) {
       tau_w_title = tau_w %>% factor(labels = tau_w_names),
       type = case_when(
         tau_c == tc_act ~ "Estimated from Data",
-        tau_c == tc_harvey_base ~ "Harvey et al. (2016) : Baseline",
-        tau_c == tc_harvey_worst ~ "Harvey et al. (2016): Conservative",
+        tau_c == tc_harvey_base ~ "Harvey, Liu, and Zhu (2016): Baseline",
+        tau_c == tc_harvey_worst ~ "Harvey, Liu, and Zhu (2016): Conservative",
         TRUE ~ "Other"
       ),
-      type = type %>% factor(levels = c("Harvey et al. (2016): Conservative", "Harvey et al. (2016) : Baseline", "Estimated from Data"))
+      type = type %>% factor(levels = c("Harvey, Liu, and Zhu (2016): Conservative", "Harvey, Liu, and Zhu (2016): Baseline", "Estimated from Data"))
     )
   print(tau_points)
   
@@ -2691,11 +2705,11 @@ plot_harvey <- function(harvey_base_res, harvey_worst_res, tau_ws, act_rr) {
       tau_w_title = tau_w %>% factor(labels = tau_w_names),
       type = case_when(
         tau_c == tc_act ~ "Estimated from Data",
-        tau_c == tc_harvey_base ~ "Harvey et al. (2016) : Baseline",
-        tau_c == tc_harvey_worst ~ "Harvey et al. (2016): Conservative",
+        tau_c == tc_harvey_base ~ "Harvey, Liu, and Zhu (2016): Baseline",
+        tau_c == tc_harvey_worst ~ "Harvey, Liu, and Zhu (2016): Conservative",
         TRUE ~ " "
       ),
-      type = type %>% factor(levels = c("Estimated from Data", "Harvey et al. (2016) : Baseline", "Harvey et al. (2016): Conservative", " "))
+      type = type %>% factor(levels = c("Estimated from Data", "Harvey, Liu, and Zhu (2016): Baseline", "Harvey et al. (2016): Conservative", " "))
     ) %>%
     ggplot(aes(tau_c, repl_rate * 100)) +
     geom_point(data = tau_points, aes(colour = type, shape = type, stroke = 1), size = 3) +
@@ -3043,14 +3057,14 @@ plot_sig_oos <- function(sig_oos_pfs, sig_type, cutoff_2012, first_date, leg_pos
       alpha = alpha / (sd(alpha)*sqrt(12)/0.1),
       cum_alpha = cumsum(alpha),
       region_pretty = case_when(
-        region == "us" ~ "US",
-        region == "world_ex_us" ~ "World ex. US"
+        region == "us" ~ "U.S.",
+        region == "world_ex_us" ~ "World ex. U.S."
       )
     )
   
   # Figure 
   sig_oos <- cumret %>%
-      ggplot(aes(eom, cum_alpha, colour = region_pretty)) +
+      ggplot(aes(eom, cum_alpha, colour = region_pretty, linetype = region_pretty)) +
       geom_line() +
       labs(y = "Cumulative Alpha") +
       theme(
@@ -3081,7 +3095,7 @@ plot_sig_oos <- function(sig_oos_pfs, sig_type, cutoff_2012, first_date, leg_pos
     rename("Region"=region)
   
   if (cutoff_2012) {
-    sig_oos <- sig_oos + geom_vline(xintercept = as.Date("2012-12-31"), linetype = "dashed", alpha = 0.5)
+    sig_oos <- sig_oos + geom_vline(xintercept = as.Date("2012-12-31"), linetype = "dotted", alpha = 1)
     tbl %>% xtable(align = "llcc") %>% print(include.rownames = F)
   } else {
     tbl %>% select(-`Post Harvey et al`) %>% xtable(align = "llc") %>% print(include.rownames = F)
