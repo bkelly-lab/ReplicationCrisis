@@ -1,11 +1,11 @@
 ## Overview
-This repository contains code that create a dataset of global stock returns and characteristics. The dataset was created for the paper [Is There a Replication Crisis in Finance?](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=3774514) by Jensen, Kelly and Pedersen (2022). Please cite this paper if you are using the code or data: 
+This repository contains code that create a dataset of global stock returns and characteristics. The dataset was created for the paper [Is There a Replication Crisis in Finance?](https://onlinelibrary.wiley.com/doi/10.1111/jofi.13249) by Jensen, Kelly and Pedersen (2023). Please cite this paper if you are using the code or data: 
 ```
-@article{JensenKellyPedersen2022,
+@article{JensenKellyPedersen2023,
    author = {Jensen, Theis Ingerslev and Kelly, Bryan T and Pedersen, Lasse Heje},
    journal = {Journal of Finance, Forthcoming},
    title = {Is There A Replication Crisis In Finance?},
-   year = {2022}
+   year = {2023}
 }
 ```
 Follow this [link](https://www.dropbox.com/sh/61j1v0sieq9z210/AACdJ68fs5_eT_eJMunwMBWia?dl=0) for a detailed documentation of the data sets.
