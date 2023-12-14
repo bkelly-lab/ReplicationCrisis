@@ -2,10 +2,13 @@
 This repository contains the code used for the paper [Is There a Replication Crisis in Finance?](https://onlinelibrary.wiley.com/doi/10.1111/jofi.13249) by Jensen, Kelly and Pedersen (2023). Please cite this paper if you are using the code or data:
 ```
 @article{JensenKellyPedersen2023,
-   author = {Jensen, Theis Ingerslev and Kelly, Bryan T and Pedersen, Lasse Heje},
-   journal = {Journal of Finance, Forthcoming},
-   title = {Is There A Replication Crisis In Finance?},
-   year = {2023}
+	author = {JENSEN, THEIS INGERSLEV and KELLY, BRYAN and PEDERSEN, LASSE HEJE},
+	title = {Is There a Replication Crisis in Finance?},
+	journal = {The Journal of Finance},
+	volume = {78},
+	number = {5},
+	pages = {2465-2518},
+	year = {2023}
 }
 ```
 Follow this [link](https://www.dropbox.com/sh/61j1v0sieq9z210/AACdJ68fs5_eT_eJMunwMBWia?dl=0) for a detailed documentation of the data sets.
