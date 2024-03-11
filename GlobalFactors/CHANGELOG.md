@@ -3,7 +3,7 @@ This change log keeps track of changes to the underlying data set. In brackets, 
 
 ## 11-03-2024 [Factor data set]
 __Changes__:
-- Added 2022 data
+- Added 2023 data
 - Updated the country classification according the latest MSCI market classification
 
 ## 03-03-2023 [Factor data set]
