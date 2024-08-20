@@ -1,11 +1,11 @@
 ## Overview
-This repository contains code that is used for the paper [Is There a Replication Crisis in Finance?](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=3774514) by Jensen, Kelly and Pedersen (2021). The code used to create the underlying dataset can be found at [https://github.com/bkelly-lab/GlobalFactor](https://github.com/bkelly-lab/GlobalFactor). Please cite Jensen, Kelly and Pedersen (2021) if using the code or data. 
+This repository contains code that is used for the paper [Is There a Replication Crisis in Finance?](https://onlinelibrary.wiley.com/doi/full/10.1111/jofi.13249) by Jensen, Kelly and Pedersen (2023). The code used to create the underlying dataset can be found at [https://github.com/bkelly-lab/GlobalFactor](https://github.com/bkelly-lab/GlobalFactor). Please cite Jensen, Kelly and Pedersen (2023) if using the code or data. 
 
 ## How To Run the Code
 
 1. Start with factor returns in each country. The files you need to download are `hml.csv`, `cmp.csv` and `market_returns.csv` using one of the following methods.
 	1. Download the factor returns used in the paper [here](https://www.dropbox.com/sh/wcrjok1qyxtrasi/AABZ90GDCUvIzDzijt8Qoo3ha?dl=0). 
-	1. Download the latest version of the factor returns [here](https://www.dropbox.com/sh/ep40dynf2w3lck4/AACYXMDxbGOv21lVK7OC4fq7a?dl=0). 
+	1. Download the latest version of the factor returns [here](https://www.dropbox.com/sh/xq278bryrj0qf9s/AABUTvTGok91kakyL07LKyQoa?dl=0). 
 	1. Generate the factor returns from scratch by following the steps in [GlobalFactors](https://github.com/bkelly-lab/ReplicationCrisis/tree/master/GlobalFactors) as the output from `portfolios.R`. 
 2. Copy the code from this repository to a local folder. 
 3. Open `main.R` in the programming language "R".

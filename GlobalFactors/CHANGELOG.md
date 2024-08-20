@@ -1,5 +1,10 @@
 # CHANGELOG.md
-This change log keeps track of changes to the underlying data set. In brackets, we highlight versions of importance. The version with _factor data set_ is the basis of the factor portfolios we upload at [https://jkpfactors.com/](https://jkpfactors.com/). The version with _paper data set_ is the the basis of the current version of [Jensen, Kelly and Pedersen (2021)](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=3774514).
+This change log keeps track of changes to the underlying data set. In brackets, we highlight versions of importance. The version with _factor data set_ is the basis of the factor portfolios we upload at [https://jkpfactors.com/](https://jkpfactors.com/). The version with _paper data set_ is the basis of [Jensen, Kelly and Pedersen (2023)](https://onlinelibrary.wiley.com/doi/full/10.1111/jofi.13249).
+
+## 11-03-2024 [Factor data set]
+__Changes__:
+- Added 2023 data
+- Updated the country classification according the latest MSCI market classification
 
 ## 03-03-2023 [Factor data set]
 __Changes__:
@@ -9,7 +14,7 @@ __Changes__:
 __Impact__:
 - Replication rate: 83.2% 
 
-## 30-06-2022 [Paper data set] [Factor data set]
+## 30-06-2022 [Paper data set] 
 
 __Changes__:
 - Changed name of "Skewness" cluster to "Short-Term Reversal"
