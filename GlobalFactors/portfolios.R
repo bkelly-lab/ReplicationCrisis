@@ -16,9 +16,9 @@ library(data.table)
 
 # User Input -----------------------
 # Paths
-data_path <- "Data"
-output_path <- "PaperFactors"
-legacy_path <- "Legacy"
+data_path <- "../../Data"
+output_path <- "../../PaperFactors"
+legacy_path <- "../../Legacy"
 # Countries
 countries <- list.files(path = paste0(data_path, "/Characteristics")) %>% str_remove(".csv")
 # Chars 
@@ -65,7 +65,7 @@ chars <- c(
 )
 # Portfolio settings
 settings <- list(
-  end_date = as.Date("2022-12-31"),
+  end_date = as.Date("2023-12-31"),
   pfs = 3,
   source = c("CRSP", "COMPUSTAT"),                           
   wins_ret = T,
@@ -249,7 +249,6 @@ portfolios <- function(
           ret_vw = sum(w_vw*ret_exc),
           ret_vw_cap = sum(w_vw_cap*ret_exc)
         ), by = .(pf, date)][, characteristic := x]
-        op$pf_daily <- op$pf_daily[n >= bp_min_n]
       }
       # Output
       return(op)  
