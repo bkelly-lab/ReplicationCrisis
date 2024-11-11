@@ -1275,11 +1275,13 @@ Importantly, a given company (gvkey) can potentially have up to 3 primary securi
 	- out: Name of the output Zip file (will be saved in &path.)
 	- data: should be the path to world_dsf
 	- path: path where data is stored. Should be a scratch directory
+	- end_date: restricts the output to till the end_date
 ;
-%macro save_daily_ret_csv(out=, data=, path=);
+%macro save_daily_ret_csv(out=, data=, path=, end_date=);
 	data daily; 
 		set &data.;
-		keep excntry id date me ret ret_exc; 
+		where date <= &end_date.;
+		keep excntry id date source_crsp me ret ret_exc; 
 	run;
 	proc sql noprint;
 		select distinct lowcase(excntry) into :countries separated by ' '
@@ -1325,10 +1327,12 @@ Importantly, a given company (gvkey) can potentially have up to 3 primary securi
 	- out: Name of the output Zip file (will be saved in &path.)
 	- data: should be the path to world_msf
 	- path: path where data is stored. Should be a scratch directory
+	- end_date: restricts the output to till the end_date
 ;
-%macro save_monthly_ret_csv(out=, data=, path=);
+%macro save_monthly_ret_csv(out=, data=, path=, end_date=);
 	data monthly; 
 		set &data.;
+		where eom <= &end_date.;
 		keep excntry id source_crsp eom me ret_exc ret ret_local; 
 	run;
 	proc export data=monthly
