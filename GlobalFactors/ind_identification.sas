@@ -425,7 +425,7 @@
 		by gvkey date;
 	run;
 	
-	proc sort data = join1;
+	proc sort data = join1 nodupkey;
 		by gvkey date;
 	run;
 	
