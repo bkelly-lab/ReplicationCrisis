@@ -3,7 +3,7 @@ This repository contains code that create a dataset of global stock returns and 
 ```
 @article{JensenKellyPedersen2023,
    author = {Jensen, Theis Ingerslev and Kelly, Bryan T and Pedersen, Lasse Heje},
-   journal = {Journal of Finance, Forthcoming},
+   journal = {Journal of Finance},
    title = {Is There A Replication Crisis In Finance?},
    year = {2023}
 }
