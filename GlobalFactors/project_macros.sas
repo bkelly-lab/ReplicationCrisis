@@ -887,7 +887,7 @@ Importantly, a given company (gvkey) can potentially have up to 3 primary securi
 * MACRO: MARKET RETURNS
 	If wins_comp=1, need to supply wins_data as well.
 ;
-%macro market_returns(out=, data=, freq=m, wins_comp=1, wins_data=); 
+%macro market_returns(out=, data=, freq=m, wins_comp=1, wins_data=, cap_data=); 
 	%if &freq.=d %then %do;
 		%let dt_col = date;
 		%let max_date_lag = 14;
@@ -897,10 +897,29 @@ Importantly, a given company (gvkey) can potentially have up to 3 primary securi
 		%let max_date_lag = 1;
 	%end;
 	/* Create Index Data */
+	
+	proc sql;
+	    create table updated_data as
+	    select a.*, b.nyse_p80
+	    from &data. as a
+	    left join &cap_data. as b
+	    on a.eom = b.eom;
+	quit;
+	
+	data updated_data;
+	    set updated_data;
+	    if me <= nyse_p80 then me_cap = me;
+	    else me_cap = nyse_p80;
+	    drop nyse_p80;
+	run;
+
+
+	
+	/* Create Index Data */
 	proc sql;
 		create table __common_stocks1 as
-		select distinct source_crsp, id, date, eom, excntry, obs_main, exch_main, primary_sec, common, ret_lag_dif, me, dolvol, ret, ret_local, ret_exc
-		from &data.
+		select distinct source_crsp, id, date, eom, excntry, obs_main, exch_main, primary_sec, common, ret_lag_dif, me, me_cap, dolvol, ret, ret_local, ret_exc
+		from updated_data
 		order by id, &dt_col.;
 	quit;
 	
@@ -908,9 +927,11 @@ Importantly, a given company (gvkey) can potentially have up to 3 primary securi
 		set __common_stocks1;
 		by id;
 		me_lag1 = lag(me);
+		me_cap_lag1 = lag(me_cap);
 		dolvol_lag1 = lag(dolvol);
 		if first.id then do;
 			me_lag1 = .;
+			me_cap_lag1 = .;
 			dolvol_lag1 = .;
 		end;
 	run;
@@ -969,13 +990,17 @@ Importantly, a given company (gvkey) can potentially have up to 3 primary securi
 		create table mkt1 as
 		select excntry, &dt_col., 
 			count(*) as stocks, 
-			sum(me_lag1) as me_lag1, 
+			sum(me_lag1) as me_lag1,
+			sum(me_cap_lag1) as me_cap_lag1,
 			sum(dolvol_lag1) as dolvol_lag1,
 			sum(ret_local*me_lag1)/(calculated me_lag1) as mkt_vw_lcl,
+			sum(ret_local*me_cap_lag1)/(calculated me_cap_lag1) as mkt_vw_cap_lcl,
 			mean(ret_local) as mkt_ew_lcl,
 			sum(ret*me_lag1)/(calculated me_lag1) as mkt_vw,
+			sum(ret*me_cap_lag1)/(calculated me_cap_lag1) as mkt_vw_cap,
 			mean(ret) as mkt_ew,
 			sum(ret_exc*me_lag1)/(calculated me_lag1) as mkt_vw_exc,
+			sum(ret_exc*me_cap_lag1)/(calculated me_cap_lag1) as mkt_vw_cap_exc,
 			mean(ret_exc) as mkt_ew_exc
 		from __common_stocks3
 		where obs_main = 1 and exch_main = 1 and primary_sec = 1 and common = 1 and ret_lag_dif <= &max_date_lag. and not missing(me_lag1) and not missing(ret_local) 
