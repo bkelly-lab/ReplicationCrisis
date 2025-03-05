@@ -12,7 +12,7 @@ proc delete data = _all_ ; run ;
 %let save_csv = 1;     * Should the main data set be save country-by-country in a .csv format?;
 %let save_daily_ret = 1;   * Save daily stocks returns country-by-country in a .csv format?;
 %let save_monthly_ret = 1;   * Save monthly stocks returns  in a .csv format;
-%let end_date = '31DEC2022'd; * Date of last observation: CRSP data is only updated annually, so we keep this updating frequency for consistency. Should be incremented every time there's an update to the CRSP database);
+%let end_date = '31DEC2024'd; * Date of last observation: CRSP data is only updated annually, so we keep this updating frequency for consistency. Should be incremented every time there's an update to the CRSP database);
 
 ***************************************************************************
 * Libraries and Functions
@@ -82,8 +82,8 @@ proc delete data=world_msf2 world_msf3; run;
 *****************************************************************************
 * Market Returns
 **************************************************************************** ; 
-%market_returns(out = scratch.market_returns, data=scratch.world_msf, freq=m, wins_comp=1, wins_data=scratch.return_cutoffs);
-%market_returns(out = scratch.market_returns_daily, data=scratch.world_dsf, freq=d, wins_comp=1, wins_data=scratch.return_cutoffs_daily);
+%market_returns(out = scratch.market_returns, data=scratch.world_msf, freq=m, wins_comp=1, wins_data=scratch.return_cutoffs, cap_data=scratch.nyse_cutoffs);
+%market_returns(out = scratch.market_returns_daily, data=scratch.world_dsf, freq=d, wins_comp=1, wins_data=scratch.return_cutoffs_daily, cap_data=scratch.nyse_cutoffs);
 
 *****************************************************************************
 * Create Characteristics Based on Accounting Data
@@ -105,7 +105,7 @@ proc datasets library=work kill nolist; quit;
 * Combine Returns, Accounting and Monthly Market Data
 **************************************************************************** ; 
 proc sql;
-	create table scratch.world_data_prelim as 
+	create table world_data_prelim as 
 	select a.*, b.*, c.*
 	from scratch.world_msf as a  
 	left join scratch.market_chars_m as b
@@ -113,7 +113,7 @@ proc sql;
 	left join scratch.acc_chars_world as c
 	on a.gvkey=c.gvkey and a.eom=c.public_date;
 
-	alter table scratch.world_data_prelim 
+	alter table world_data_prelim 
 	drop div_tot, div_cash, div_spc, public_date, source; 
 quit;
 
@@ -127,19 +127,24 @@ quit;
 * Asset Pricing Factors
 **************************************************************************** ; 
 * Create monthly and daily factors from FF3 and HXZ4;
-%ap_factors(out=scratch.ap_factors_daily, freq=d, sf=scratch.world_dsf, mchars=scratch.world_data_prelim, mkt=scratch.market_returns_daily, min_stocks_bp=10, min_stocks_pf=3);	
-%ap_factors(out=scratch.ap_factors_monthly, freq=m, sf=scratch.world_msf, mchars=scratch.world_data_prelim, mkt=scratch.market_returns, min_stocks_bp=10, min_stocks_pf=3);	
+%ap_factors(out=scratch.ap_factors_daily, freq=d, sf=scratch.world_dsf, mchars=world_data_prelim, mkt=scratch.market_returns_daily, min_stocks_bp=10, min_stocks_pf=3);	
+%ap_factors(out=scratch.ap_factors_monthly, freq=m, sf=scratch.world_msf, mchars=world_data_prelim, mkt=scratch.market_returns, min_stocks_bp=10, min_stocks_pf=3);	
 
 *****************************************************************************
 * Factor based on combined data
 **************************************************************************** ;
 %firm_age(data=scratch.world_msf, out=scratch.firm_age);
-%mispricing_factors(out=scratch.mp_factors, data=scratch.world_data_prelim, min_stks=10, min_fcts=3);	
+%mispricing_factors(out=scratch.mp_factors, data=world_data_prelim, min_stks=10, min_fcts=3);	
 %market_beta(out=scratch.beta_60m, data=scratch.world_msf, fcts=scratch.ap_factors_monthly, __n=60, __min=36);
 %residual_momentum(out=scratch.resmom_ff3, data=scratch.world_msf, fcts=scratch.ap_factors_monthly, type=ff3, __n =36, __min=24, incl=12 6, skip=1 1);
 
 * Free up space;
-proc datasets library=work kill nolist; quit;
+proc datasets library=work nolist;
+   delete _all_ / memtype=data;  /* Deletes all datasets */
+   protect world_data_prelim;    /* Prevents world_data_prelim from being deleted */
+quit;
+
+
 
 *****************************************************************************
 * Create Characteristics Based on Daily Market Data
@@ -163,7 +168,12 @@ proc datasets library=work kill nolist; quit;
 %end;
 
 * Free up space;
-proc datasets library=work kill nolist; quit;
+proc datasets library=work nolist;
+   delete _all_ / memtype=data;  /* Deletes all datasets */
+   protect world_data_prelim;    /* Prevents world_data_prelim from being deleted */
+quit;
+
+
 
 *****************************************************************************
 * Combine all characteristics and build final dataset
@@ -171,7 +181,7 @@ proc datasets library=work kill nolist; quit;
 proc sql;
 	create table world_data3 as
 	select a.*, b.beta_60m, b.ivol_capm_60m, c.resff3_12_1, d.resff3_6_1, e.mispricing_mgmt, e.mispricing_perf, f.*, g.age
-	from scratch.world_data_prelim as a 
+	from world_data_prelim as a 
 	left join scratch.beta_60m as b on a.id=b.id and a.eom=b.eom
 	left join scratch.resmom_ff3_12_1 as c on a.id=c.id and a.eom=c.eom
 	left join scratch.resmom_ff3_6_1 as d on a.id=d.id and a.eom=d.eom
@@ -201,7 +211,7 @@ run;
 * Delete Temporary Files;
 %if &delete_temp.=1 %then %do;
 	proc delete data=
-		scratch.world_data_prelim
+		world_data_prelim
 		scratch.beta_60m scratch.qmj scratch.resmom_ff3_12_1 scratch.resmom_ff3_6_1 
 		scratch.mp_factors scratch.firm_age scratch.market_chars_d; 
 	run;
@@ -252,11 +262,11 @@ option notes;
 %end;
 * Save daily return data as .csv files by country;
 %if &save_daily_ret.=1 %then %do;
-	%save_daily_ret_csv(out=Daily Returns, data=scratch.world_dsf, path=&scratch_folder./output);
+	%save_daily_ret_csv(out=Daily Returns, data=scratch.world_dsf, path=&scratch_folder./output, end_date=&end_date.);
 %end;
 * Save monthly return data as .csv files by country;
 %if &save_monthly_ret.=1 %then %do;
-	%save_monthly_ret_csv(out=world_ret_monthly, data=scratch.world_msf, path=&scratch_folder./output);
+	%save_monthly_ret_csv(out=world_ret_monthly, data=scratch.world_msf, path=&scratch_folder./output, end_date=&end_date.);
 %end;
 * Delete Temporary Files;
 %if &delete_temp.=1 %then %do;

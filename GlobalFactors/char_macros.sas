@@ -500,7 +500,7 @@
 	__o_nich = (nix_x - lag12(nix_x)) / (abs(nix_x) + abs(lag12(nix_x)));
 	if count <= 12 or (abs(nix_x) + abs(lag12(nix_x))) = 0 then __o_nich = .;
 	* Create O-score;
-	&name. = -1.32 - 0.407 * __o_lat + 6.03 * __o_lev + 1.43 * __o_wc
+	&name. = -1.32 - 0.407 * __o_lat + 6.03 * __o_lev - 1.43 * __o_wc
 	          + 0.076 * __o_cacl - 1.72 * __o_neg_eq - 2.37 * __o_roe
 	          - 1.83 * __o_ffo + 0.285 * __o_neg_earn - 0.52 * __o_nich;
 %mend;
