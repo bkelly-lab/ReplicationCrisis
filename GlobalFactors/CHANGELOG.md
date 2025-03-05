@@ -1,6 +1,14 @@
 # CHANGELOG.md
 This change log keeps track of changes to the underlying data set. In brackets, we highlight versions of importance. The version with _factor data set_ is the basis of the factor portfolios we upload at [https://jkpfactors.com/](https://jkpfactors.com/). The version with _paper data set_ is the basis of [Jensen, Kelly and Pedersen (2023)](https://onlinelibrary.wiley.com/doi/full/10.1111/jofi.13249).
 
+## 05-03-2024 [Factor data set]
+__Changes__:
+- Added 2024 data
+- moved world_data_prelim from scratch to work folder
+- updated market returns macro to add a capped value option
+- corrected error in o-score calculation
+- added end_date filter in macros saving daily and monthly returns 
+
 ## 11-03-2024 [Factor data set]
 __Changes__:
 - Added 2023 data
