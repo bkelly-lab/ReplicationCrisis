@@ -1,4 +1,4 @@
-## This repository is no longer updated
+## THIS REPO IS NO LONGER MAINTAINED
 
 We have transitioned the codebase from SAS to Python. Please use [bkelly-lab/jkp-data](https://github.com/bkelly-lab/jkp-data) for the actively maintained version of the codebase.
 
