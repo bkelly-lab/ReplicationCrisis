@@ -1,3 +1,9 @@
+## THIS REPO IS NO LONGER MAINTAINED
+
+We have transitioned the codebase from SAS to Python. Please use [bkelly-lab/jkp-data](https://github.com/bkelly-lab/jkp-data) for the actively maintained version of the codebase.
+
+The latest data remain available through [WRDS Global Factor Data](https://wrds-www.wharton.upenn.edu/pages/get-data/contributed-data-forms/global-factor-data/).
+
 ## Overview
 This repository contains the code used for the paper [Is There a Replication Crisis in Finance?](https://onlinelibrary.wiley.com/doi/10.1111/jofi.13249) by Jensen, Kelly and Pedersen (2023). Please cite this paper if you are using the code or data:
 ```
