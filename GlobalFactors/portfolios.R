@@ -332,7 +332,8 @@ nyse_size_cutoffs <- fread(paste0(data_path, "/nyse_cutoffs.csv"), colClasses = 
 nyse_size_cutoffs[, eom := as.Date(eom, format = "%Y%m%d")]
 # CRSP Return Cutoffs
 ret_cutoffs <- fread(paste0(data_path, "/return_cutoffs.csv"), colClasses = c("eom"="character"))
-ret_cutoffs[, eom := as.Date(eom, format = "%Y%m%d")]
+ret_cutoffs[, eom := as.Date(eom, tryFormats = c("%Y%m%d", "%Y-%m-%d"))]  # File may store eom as yyyymmdd or yyyy-mm-dd
+if (anyNA(ret_cutoffs$eom)) stop("return_cutoffs.csv: eom failed to parse; winsorization of Compustat returns would be a no-op")
 ret_cutoffs[, eom_lag1 := floor_date(eom, unit = "month") - 1]  # Because we use ret_exc_lead1m
 if (settings$daily_pf) {
   ret_cutoffs_daily <- fread(paste0(data_path, "/return_cutoffs_daily.csv")) 
