@@ -413,12 +413,24 @@ Description:
 	%if &coverage. = 'world' %then %do;
 		%let aname = __wfunda;
 		%let qname = __wfundq;
+		/* If NA and Global report the same firm-period, keep the Global record */
+		proc sql;
+			create table __funda_x as
+			select n.* from __funda as n
+			where not exists (select * from __gfunda as g where g.gvkey=n.gvkey and g.datadate=n.datadate);
+
+			create table __fundq_x as
+			select n.* from __fundq as n
+			where not exists (select * from __gfundq as g
+				where g.gvkey=n.gvkey and g.fyr=n.fyr and g.fyearq=n.fyearq and g.fqtr=n.fqtr);
+		quit;
 		data &aname.;
-			set __gfunda __funda;
+			set __gfunda __funda_x;
 		run;
 		data &qname.;
-			set __gfundq __fundq;
+			set __gfundq __fundq_x;
 		run;
+		proc delete data=__funda_x __fundq_x; run;
 		/*proc delete data= __gfunda __gfundq __funda __fundq; run;*/
 	%end;
 
