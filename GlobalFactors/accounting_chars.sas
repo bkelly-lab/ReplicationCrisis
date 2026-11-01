@@ -503,16 +503,18 @@ Description:
 			dsq dltrq ltdchq dlcchq
 			fincfq fiaoq txbcofq dvtq;
 		
+		qidx = 4*fyearq + fqtr; qidx_l3 = lag3(qidx); /* Fiscal quarter number: the four quarters must be consecutive */
 		%do i=1 %to %nwords(&yrl_vars.);
 			%let var_yrl = %scan(&yrl_vars., &i, %str(' '));
 			%let var_yrl_name = %sysfunc(prxchange(s/q$//, 1, &var_yrl.));  
 			&var_yrl_name. = %ttm(&var_yrl.);
-			if (gvkey^=lag3(gvkey) or fyr^=lag3(fyr) or curcdq^=lag3(curcdq) or %ttm(fqtr)^=10) then 
+			if (gvkey^=lag3(gvkey) or fyr^=lag3(fyr) or curcdq^=lag3(curcdq) or %ttm(fqtr)^=10 or qidx-qidx_l3^=3) then 
 				&var_yrl_name. = .;
 			if missing(&var_yrl_name.) and fqtr=4 then
 				&var_yrl_name. = &var_yrl_name.y;  * If financial quarter is 4, the ytd variable is yearly;
 			drop &var_yrl. &var_yrl_name.y;
 		%end;
+		drop qidx qidx_l3;
 		
 		* Rename All Other (Balance Sheet and CURCDQ) Items to Facilitate Merge (This should be made automatic at some point);
 		%let bs_vars = seqq ceqq pstkq icaptq mibq gdwlq req 
