@@ -413,12 +413,24 @@ Description:
 	%if &coverage. = 'world' %then %do;
 		%let aname = __wfunda;
 		%let qname = __wfundq;
+		/* If NA and Global report the same firm-period, keep the Global record */
+		proc sql;
+			create table __funda_x as
+			select n.* from __funda as n
+			where not exists (select * from __gfunda as g where g.gvkey=n.gvkey and g.datadate=n.datadate);
+
+			create table __fundq_x as
+			select n.* from __fundq as n
+			where not exists (select * from __gfundq as g
+				where g.gvkey=n.gvkey and g.fyr=n.fyr and g.fyearq=n.fyearq and g.fqtr=n.fqtr);
+		quit;
 		data &aname.;
-			set __gfunda __funda;
+			set __gfunda __funda_x;
 		run;
 		data &qname.;
-			set __gfundq __fundq;
+			set __gfundq __fundq_x;
 		run;
+		proc delete data=__funda_x __fundq_x; run;
 		/*proc delete data= __gfunda __gfundq __funda __fundq; run;*/
 	%end;
 
@@ -471,6 +483,8 @@ Description:
 	proc delete data= &aname. &qname.;
 	 
 	/* Change Quarterly Data to Be Comparable to Annual Data */
+	/* Drop records without a fiscal quarter, which Compustat keeps from a firm's old fiscal calendar after it changes its fiscal year-end */
+	data __compq1; set __compq1; if missing(fqtr) then delete; run;
 	%QUARTERIZE(inset=__compq1, outset=__compq2, idvar=gvkey fyr, fyear=fyearq, fqtr=fqtr); /* Quarterize the YTD flow accounting variables */
 	proc sort data=__compq2 nodupkey; by gvkey fyr fyearq fqtr; run; /*THEIS: 0 Deleted in the US*/
 	%macro ttm(var); (&var + lag1(&var) + lag2(&var) + lag3(&var)) %mend; /* Note that ttm will return missing if either of the lags are missing. This is the behavior we want. */
