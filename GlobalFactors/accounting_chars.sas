@@ -483,6 +483,8 @@ Description:
 	proc delete data= &aname. &qname.;
 	 
 	/* Change Quarterly Data to Be Comparable to Annual Data */
+	/* Drop records without a fiscal quarter, which Compustat keeps from a firm's old fiscal calendar after it changes its fiscal year-end */
+	data __compq1; set __compq1; if missing(fqtr) then delete; run;
 	%QUARTERIZE(inset=__compq1, outset=__compq2, idvar=gvkey fyr, fyear=fyearq, fqtr=fqtr); /* Quarterize the YTD flow accounting variables */
 	proc sort data=__compq2 nodupkey; by gvkey fyr fyearq fqtr; run; /*THEIS: 0 Deleted in the US*/
 	%macro ttm(var); (&var + lag1(&var) + lag2(&var) + lag3(&var)) %mend; /* Note that ttm will return missing if either of the lags are missing. This is the behavior we want. */
