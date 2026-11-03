@@ -1221,13 +1221,16 @@ Description:
 	proc sql;
 		create table __acc_chars1 as 
 		select a.*, b.*
-		from &ann_data. as a left join &qtr_data. as b
-		on a.gvkey=b.gvkey and a.public_date=b.public_date;
+		from &ann_data. as a full join &qtr_data.(rename=(source=__source_q gvkey=__gvkey_q public_date=__public_date_q)) as b
+		on a.gvkey=b.__gvkey_q and a.public_date=b.__public_date_q;
 	quit;
-	
+
 	/* Substitute Annual Characteristic for Quarterly if Quarterly is more recent */
 	data __acc_chars2;
 		set __acc_chars1;
+		if missing(gvkey) then do; /* Firm-month with quarterly but no annual data */
+			source = __source_q; gvkey = __gvkey_q; public_date = __public_date_q;
+		end;
 		%do i=1 %to %nwords(&__char_vars.);
 			%let ann_var = %scan(&__char_vars., &i.);
 			%let qtr_var = &ann_var.&q_suffix.;
@@ -1235,7 +1238,7 @@ Description:
 				&ann_var. = &qtr_var.;
 			drop &qtr_var.;
 		%end;
-		drop datadate datadate&q_suffix.; /* We can no longer be sure which items accounting dates refer to */
+		drop datadate datadate&q_suffix. __source_q __gvkey_q __public_date_q; /* We can no longer be sure which items accounting dates refer to */
 	run;
 	
 	proc sort nodupkey data=__acc_chars2 out=&out; by gvkey public_date; run;
